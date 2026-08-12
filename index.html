@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0e13" />
   <title>NPS Cams</title>
   <style>
     :root {
@@ -50,6 +51,8 @@
     }
 
     html, body { height: 100%; }
+    /* Solid dark canvas so orientation changes / overscroll never flash white. */
+    html { background: var(--bg); }
 
     body {
       margin: 0;
@@ -315,6 +318,7 @@
       object-fit: contain;
       display: block;
     }
+    .stage-img img[hidden] { display: none; }
 
     .stage-bar {
       display: flex;
@@ -455,7 +459,7 @@
       <div class="detail">
         <div class="stage">
           <div class="stage-img">
-            <span class="badge" id="stageBadge"><span class="dot"></span> <span class="badge-label">Live</span></span>
+            <span class="badge" id="stageBadge"><span class="dot"></span> <span class="badge-label">Online</span></span>
             <img id="stageImage" alt="" />
             <iframe id="stageStream" hidden allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
           </div>
@@ -466,6 +470,7 @@
             <div class="spacer"></div>
             <span class="count" id="stageCount">next in 60s</span>
             <a class="iconBtn" id="stageWatch" target="_blank" rel="noopener" hidden>Watch ↗</a>
+            <a class="iconBtn" id="stageLive" target="_blank" rel="noopener" hidden>Watch live ↗</a>
             <button class="iconBtn" id="stageRefresh">Refresh</button>
             <button class="iconBtn" id="stageSave">Save image</button>
           </div>
@@ -550,7 +555,7 @@
             {
               area: 'Old Faithful',
               cameras: [
-                { id: 'yell-old-faithful', name: 'Old Faithful & Upper Geyser Basin', url: 'https://cdn.pixelcaster.com/public.pixelcaster.com/snapshots/yellowstone-old-faithful/latest_1920x.jpg' },
+                { id: 'yell-old-faithful', name: 'Old Faithful & Upper Geyser Basin', url: 'https://cdn.pixelcaster.com/public.pixelcaster.com/snapshots/yellowstone-old-faithful/latest_1920x.jpg', live: 'https://www.nps.gov/media/webcam/view.htm?id=CE843A37-74A2-4408-9176-26A8DCC97294' },
               ],
             },
           ],
@@ -780,10 +785,10 @@
             {
               area: 'Valley Views',
               cameras: [
-                { id: 'yose-halfdome', name: 'Half Dome', url: 'https://pixelcaster.com/yosemite/webcams/ahwahnee2.jpg' },
-                { id: 'yose-falls', name: 'Yosemite Falls', url: 'https://pixelcaster.com/yosemite/webcams/yosfalls.jpg' },
+                { id: 'yose-halfdome', name: 'Half Dome', url: 'https://pixelcaster.com/yosemite/webcams/ahwahnee2.jpg', live: 'https://www.nps.gov/media/webcam/view.htm?id=EAA24FCD-BC0D-C360-19BF30B462D0ACE8' },
+                { id: 'yose-falls', name: 'Yosemite Falls', url: 'https://pixelcaster.com/yosemite/webcams/yosfalls.jpg', live: 'https://www.nps.gov/media/webcam/view.htm?id=3E81EC42-BB62-0A59-E30ABB8F1646322E' },
                 { id: 'yose-sentinel', name: 'Sentinel Dome / El Capitan', url: 'https://pixelcaster.com/yosemite/webcams/sentinel.jpg' },
-                { id: 'yose-turtleback', name: 'Turtleback Dome', url: 'https://pixelcaster.com/yosemite/webcams/turtleback.jpg' },
+                { id: 'yose-turtleback', name: 'Turtleback Dome', url: 'https://pixelcaster.com/yosemite/webcams/turtleback.jpg', live: 'https://www.nps.gov/media/webcam/view.htm?id=B28D5845-C504-BBA5-17748BFF1C6CC716' },
               ],
             },
             {
@@ -1146,7 +1151,21 @@
       const brandSub = document.getElementById('brandSub');
 
       const stageImage = document.getElementById('stageImage');
-      const stageStream = document.getElementById('stageStream');
+      let stageStream = document.getElementById('stageStream');
+      // Swapping in a fresh iframe (vs. reassigning .src) keeps the embedded
+      // player's internal navigations out of the browser's joint session
+      // history — otherwise Back would unwind the iframe before the app,
+      // forcing a second "← All cameras" click on stream pages.
+      function replaceStageStream() {
+        const fresh = document.createElement('iframe');
+        fresh.id = 'stageStream';
+        fresh.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
+        fresh.setAttribute('allowfullscreen', '');
+        fresh.hidden = true;
+        stageStream.replaceWith(fresh);
+        stageStream = fresh;
+        return fresh;
+      }
       const stageBadge = document.getElementById('stageBadge');
       const stageTitle = document.getElementById('stageTitle');
       const stageArea = document.getElementById('stageArea');
@@ -1154,6 +1173,7 @@
       const stageRefresh = document.getElementById('stageRefresh');
       const stageSave = document.getElementById('stageSave');
       const stageWatch = document.getElementById('stageWatch');
+      const stageLive = document.getElementById('stageLive');
       const stageFav = document.getElementById('stageFav');
       const sideList = document.getElementById('sideList');
       const searchInput = document.getElementById('searchInput');
@@ -1299,7 +1319,7 @@
         el.classList.remove('warn', 'bad', 'stream');
         if (state === 'offline') el.classList.add('bad');
         else if (state === 'stream') el.classList.add('stream');
-        else if (state !== 'live') el.classList.add('warn');
+        else if (state !== 'live' && state !== 'online') el.classList.add('warn');
         const lab = el.querySelector('.badge-label');
         if (lab) lab.textContent = label;
       }
@@ -1309,7 +1329,10 @@
         const cam = camById(id);
         if (!cam) return;
         const rec = ageInfo[id];
-        let state = 'live', label = 'Live';
+        // Refreshing still images are "Online"; reserve "Live" for cams that
+        // also offer an actual live video feed (cam.live). Video embeds are
+        // badged "Stream" elsewhere.
+        let state = cam.live ? 'live' : 'online', label = cam.live ? 'Live' : 'Online';
         if (cam.off) {
           // NPS lists this camera as inactive.
           state = 'offline'; label = 'Offline';
@@ -1551,16 +1574,19 @@
         stageRefresh.hidden = isStream;
         stageCount.hidden = isStream;
         stageWatch.hidden = !isStream;
+        // Image cameras backed by a live feed get a link to the livestream page.
+        stageLive.hidden = isStream || !cam.live;
+        if (cam.live) stageLive.href = cam.live;
         if (isStream) {
           stageImage.hidden = true;
-          stageStream.hidden = false;
-          stageStream.src = streamEmbedSrc(cam);
+          const frame = replaceStageStream();
+          frame.hidden = false;
+          frame.src = streamEmbedSrc(cam);
           setBadge(stageBadge, 'stream', 'Stream');
           stageWatch.href = streamWatch(cam);
           stageWatch.textContent = ytId(cam.embed) ? 'Watch on YouTube ↗' : 'Open live ↗';
         } else {
-          stageStream.hidden = true;
-          stageStream.removeAttribute('src');
+          replaceStageStream();
           stageImage.hidden = false;
           registerImg(id, stageImage, null, null, stageBadge);
         }
@@ -1578,7 +1604,7 @@
       function openGrid() {
         activeId = null;
         clearImgRefs();
-        if (stageStream) stageStream.removeAttribute('src');
+        if (stageStream && stageStream.src) replaceStageStream();
         buildGrid();
         detailView.hidden = true;
         gridView.hidden = false;
@@ -1701,7 +1727,7 @@
       function applyGridChange() {
         if (activeId !== null) { openGrid(); return; }
         clearImgRefs();
-        if (stageStream) stageStream.removeAttribute('src');
+        if (stageStream && stageStream.src) replaceStageStream();
         buildGrid();
         refreshAll();
         resetTimer();

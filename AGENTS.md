@@ -10,7 +10,8 @@ CSS, and vanilla JavaScript in one file. No build step, no framework, no
 package manager. Open the file in a browser to run it.
 
 Covers ~35 National Parks (~200+ feeds): refreshing still images **and** live
-video streams, each tagged Live / Daytime / Stale / Offline / Stream. The camera
+video streams, each tagged Online / Live / Daytime / Stale / Offline / Stream.
+The camera
 list was seeded from the NPS webcam catalog (see "Camera catalog & the NPS Solr
 API" below).
 
@@ -22,13 +23,17 @@ All application code is inside the single IIFE `<script>` at the bottom of
 ### Data model
 - `PARKS` — the source of truth. An array of `{ park, areas[] }`.
   - Each area is `{ area, cameras[] }`.
-  - Each camera is `{ id, name, url?, off?, type?, embed? }`:
+  - Each camera is `{ id, name, url?, off?, type?, embed?, live? }`:
     - `id` — stable unique slug (also the favorite key / cross-park lookup key).
     - `name` — display label.
     - `url` — base image URL, no query string (image cameras).
     - `off: true` — NPS lists the camera as *Inactive* → red **Offline** badge.
     - `type: 'stream'` + `embed` — a live video feed (YouTube / HDOnTap / …);
       has no `url`. See "Streams" below.
+    - `live` — optional URL to an external live-video page for an image camera
+      whose stream can't be embedded (token-gated Pixelcaster: Old Faithful,
+      Yosemite Falls / Half Dome / El Capitan). Adds a **Watch live ↗** button
+      on the detail page and upgrades its badge from **Online** to **Live**.
 - `ALL_CAMERAS` / `camById(id)` — flat global lookups across every park.
 - `currentCameras()` — cameras for the currently selected park only.
 - `parkIndex` / `AREAS` — current park selection state.
@@ -64,7 +69,10 @@ All application code is inside the single IIFE `<script>` at the bottom of
   fetch). Prefers the native Save As dialog via `showSaveFilePicker()`, falling
   back to an anchor download, then to opening the image in a new tab.
 - **Status badges** — every tile/stage carries a badge (`applyBadge` / `setBadge`):
-  - **Live** (green) — default for image cameras.
+  - **Online** (green) — default for refreshing still-image cameras.
+  - **Live** (green) — image cameras that also expose an external live-video
+    feed (`cam.live` is set); same green styling as Online, plus a
+    **Watch live ↗** button on the detail page.
   - **Daytime** (amber) — NPS Air Resources air-quality cams (URL matches
     `AIRQUALITY_RE` = `featurecontent/ard/webcams`). They refresh only in
     daylight and freeze overnight, so their `name` ends with
