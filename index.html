@@ -88,6 +88,9 @@
       font-weight: 600;
     }
     .brand h1 { font-size: 22px; margin: 0; font-weight: 700; letter-spacing: .2px; }
+    .brand h1 a { color: inherit; text-decoration: none; }
+    .brand h1 a[href]:hover { color: var(--accent-hover); text-decoration: underline; }
+    .brand h1 a[href]::after { content: " \2197"; font-size: .7em; color: var(--muted); font-weight: 600; }
     .topbar .spacer { flex: 1; }
 
     .backBtn {
@@ -420,7 +423,7 @@
       <button class="backBtn" id="backBtn">&larr; All cameras</button>
       <div class="brand">
         <span class="eyebrow">National Park Webcams</span>
-        <h1 id="brandSub">Live views</h1>
+        <h1 id="brandTitle"><a id="brandSub" target="_blank" rel="noopener">Live views</a></h1>
       </div>
       <label class="pill search">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
@@ -1107,6 +1110,24 @@
       const ALL_CAMERAS = PARKS.flatMap(p => p.areas.flatMap(a => a.cameras));
       const CAMERAS = ALL_CAMERAS; // refreshAll iterates current-park cams (see below)
       function camById(id) { return ALL_CAMERAS.find(c => c.id === id); }
+
+      // NPS park codes → link the header title to each park's page on nps.gov.
+      const PARK_CODES = {
+        'Mount Rainier': 'mora', 'Yellowstone': 'yell', 'Grand Teton': 'grte',
+        'Glacier': 'glac', 'Olympic': 'olym', 'Denali': 'dena',
+        'Rocky Mountain': 'romo', 'Crater Lake': 'crla', 'Grand Canyon': 'grca',
+        'Great Smoky Mountains': 'grsm', 'Hawaiʻi Volcanoes': 'havo',
+        'Yosemite': 'yose', 'Acadia': 'acad', 'Zion': 'zion', 'Arches': 'arch',
+        'Big Bend': 'bibe', 'Black Canyon of the Gunnison': 'blca',
+        'Bryce Canyon': 'brca', 'Death Valley': 'deva', 'Glacier Bay': 'glba',
+        'Great Sand Dunes': 'grsa', 'Guadalupe Mountains': 'gumo',
+        'Haleakāla': 'hale', 'Isle Royale': 'isro', 'Joshua Tree': 'jotr',
+        'Lassen Volcanic': 'lavo', 'Mammoth Cave': 'maca', 'Mesa Verde': 'meve',
+        'New River Gorge': 'neri', 'Sequoia & Kings Canyon': 'seki',
+        'Shenandoah': 'shen', 'Wrangell-St. Elias': 'wrst', 'Katmai': 'katm',
+        'Carlsbad Caverns': 'cave', 'Channel Islands': 'chis',
+      };
+
       function areaOf(id) {
         for (const p of PARKS) {
           const a = p.areas.find(a => a.cameras.some(c => c.id === id));
@@ -1597,8 +1618,21 @@
         refreshAll();
         resetTimer();
         updateHash();
+        updateBrandLink();
         saveSession();
         window.scrollTo(0, 0);
+      }
+
+      // Point the header title at the current park's nps.gov page.
+      function updateBrandLink() {
+        const code = PARK_CODES[PARKS[parkIndex].park];
+        if (code) {
+          brandSub.href = 'https://www.nps.gov/' + code + '/index.htm';
+          brandSub.title = 'Visit ' + PARKS[parkIndex].park + ' on nps.gov';
+        } else {
+          brandSub.removeAttribute('href');
+          brandSub.removeAttribute('title');
+        }
       }
 
       function openGrid() {
@@ -1612,6 +1646,7 @@
         refreshAll();
         resetTimer();
         updateHash();
+        updateBrandLink();
         saveSession();
       }
 
@@ -1779,6 +1814,7 @@
           refreshAll();
         }
         updateHash();
+        updateBrandLink();
         suppressHistory = false;
         resetTimer();
       })();
