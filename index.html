@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mount Rainier Webcams</title>
+  <title>NPS Cams</title>
   <style>
     :root {
       --bg: #0b0e13;
@@ -16,6 +16,7 @@
       --accent-hover: #4b98ff;
       --danger: #f85149;
       --live: #3fb950;
+      --warn: #d29922;
       --radius: 14px;
       --shadow: 0 8px 30px rgba(0,0,0,.35);
     }
@@ -65,6 +66,7 @@
     .topbar {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 14px;
       padding: 16px 24px;
       border-bottom: 1px solid var(--border);
@@ -131,6 +133,19 @@
       font-weight: 600;
     }
     .pill select option { background: var(--panel-2); color: var(--text); }
+    .pill.search { flex: 1 1 200px; min-width: 150px; }
+    .pill.search input { width: auto; flex: 1; text-align: left; }
+    .pill.search svg { width: 14px; height: 14px; fill: none; stroke: var(--muted); stroke-width: 2; flex: none; }
+    .pill.search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+    .chip {
+      background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+      border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+      white-space: nowrap; transition: background .15s, border-color .15s, color .15s;
+    }
+    .chip:hover { border-color: #313a48; }
+    .chip.on { background: rgba(47,129,247,.15); border-color: var(--accent); color: var(--accent-hover); }
+    a.iconBtn { text-decoration: none; }
+    .empty { padding: 48px 24px; color: var(--muted); font-size: 14px; text-align: center; }
 
     .dot {
       width: 8px; height: 8px; border-radius: 50%;
@@ -210,6 +225,21 @@
       color: #fff;
     }
     .badge .dot { width: 7px; height: 7px; }
+    .badge.warn .dot { background: var(--warn); box-shadow: 0 0 0 3px rgba(210,153,34,.18); }
+    .badge.bad  .dot { background: var(--danger); box-shadow: 0 0 0 3px rgba(248,81,73,.18); }
+    .badge.warn .badge-label { color: #f2cc60; }
+    .badge.bad  .badge-label { color: #ff9d95; }
+    .badge.stream .dot { background: var(--accent); box-shadow: 0 0 0 3px rgba(47,129,247,.22); }
+    .badge.stream .badge-label { color: #9ec5ff; }
+    .thumb .noposter { position: absolute; inset: 0; background: linear-gradient(135deg,#1b2431,#0d1117); }
+    #stageStream { width: 100%; height: 100%; border: 0; }
+    .thumb .playbtn {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      width: 54px; height: 54px; border-radius: 50%;
+      background: rgba(0,0,0,.55); backdrop-filter: blur(2px);
+      display: flex; align-items: center; justify-content: center; pointer-events: none;
+    }
+    .thumb .playbtn::after { content: ''; border-style: solid; border-width: 10px 0 10px 17px; border-color: transparent transparent transparent #fff; margin-left: 3px; }
 
     /* ---------- Favorite star (on thumbnails) ---------- */
     .star {
@@ -388,7 +418,12 @@
         <span class="eyebrow">National Park Webcams</span>
         <h1 id="brandSub">Live views</h1>
       </div>
-      <div class="spacer"></div>
+      <label class="pill search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input id="searchInput" type="search" placeholder="Search all cameras…" autocomplete="off" />
+      </label>
+      <button class="chip" id="chipOffline" title="Hide cameras NPS lists as inactive">Hide offline</button>
+      <button class="chip" id="chipStreams" title="Show only live video streams">Streams</button>
       <span class="pill">
         Park
         <select id="parkSelect"></select>
@@ -420,8 +455,9 @@
       <div class="detail">
         <div class="stage">
           <div class="stage-img">
-            <span class="badge"><span class="dot"></span> Live</span>
+            <span class="badge" id="stageBadge"><span class="dot"></span> <span class="badge-label">Live</span></span>
             <img id="stageImage" alt="" />
+            <iframe id="stageStream" hidden allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
           </div>
           <div class="stage-bar">
             <span class="title" id="stageTitle"></span>
@@ -429,6 +465,7 @@
             <button class="iconBtn favBtn" id="stageFav">☆ Favorite</button>
             <div class="spacer"></div>
             <span class="count" id="stageCount">next in 60s</span>
+            <a class="iconBtn" id="stageWatch" target="_blank" rel="noopener" hidden>Watch ↗</a>
             <button class="iconBtn" id="stageRefresh">Refresh</button>
             <button class="iconBtn" id="stageSave">Save image</button>
           </div>
@@ -462,7 +499,13 @@
                 { id: 'paradise-west', name: 'West', url: 'https://www.nps.gov/webcams-mora/west.jpg' },
                 { id: 'paradise-gh', name: 'Guide House', url: 'https://www.nps.gov/webcams-mora/gh.jpg' },
                 { id: 'paradise-tatoosh', name: 'Tatoosh Range', url: 'https://www.nps.gov/webcams-mora/tatoosh.jpg' },
-                { id: 'paradise-airquality', name: 'Air Quality', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/mora.jpg' },
+                { id: 'paradise-airquality', name: 'Air Quality (daytime only)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/mora.jpg' },
+              ],
+            },
+            {
+              area: 'Longmire Area',
+              cameras: [
+                { id: 'mora-longmire', name: 'Longmire', url: 'https://www.nps.gov/webcams-mora/longmire.jpg' },
               ],
             },
           ],
@@ -504,6 +547,12 @@
                 { id: 'yell-east-in', name: 'Into the Park', url: 'https://www.nps.gov/webcams-yell/east_in.jpg' },
               ],
             },
+            {
+              area: 'Old Faithful',
+              cameras: [
+                { id: 'yell-old-faithful', name: 'Old Faithful & Upper Geyser Basin', url: 'https://cdn.pixelcaster.com/public.pixelcaster.com/snapshots/yellowstone-old-faithful/latest_1920x.jpg' },
+              ],
+            },
           ],
         },
         {
@@ -512,7 +561,13 @@
             {
               area: 'Teton Science School',
               cameras: [
-                { id: 'grte-tss', name: 'Kelly Campus (Air Quality)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/grtelarge.jpg' },
+                { id: 'grte-tss', name: 'Kelly Campus (Air Quality · daytime only)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/grtelarge.jpg' },
+              ],
+            },
+            {
+              area: 'Live Streams',
+              cameras: [
+                { id: 'grte-craig-thomas', name: 'Craig Thomas Discovery & Visitor Center', type: 'stream', embed: 'https://www.youtube.com/embed/XhBUrjhJm1A' },
               ],
             },
           ],
@@ -525,6 +580,8 @@
               cameras: [
                 { id: 'glac-apgar-mtn', name: 'Apgar Mountain', url: 'https://www.nps.gov/webcams-glac/ApgarLookout-01.jpg' },
                 { id: 'glac-apgar-village', name: 'Apgar Village', url: 'https://www.nps.gov/webcams-glac/ApgarVillage.jpg' },
+                { id: 'glac-apgar-vc', name: 'Apgar Visitor Center Plaza', url: 'https://www.nps.gov/webcams-glac/ApgarVisitorCenter.jpg' },
+                { id: 'glac-apgar-2', name: 'Apgar Village (PTZ)', url: 'https://www.nps.gov/webcams-glac/ApgarVillagePTZ.jpg' },
                 { id: 'glac-mcdonald-1', name: 'Lake McDonald', url: 'https://www.nps.gov/webcams-glac/LakeMcDonald1.jpg' },
                 { id: 'glac-mcdonald-2', name: 'Lake McDonald (PTZ)', url: 'https://www.nps.gov/webcams-glac/lakemcdonaldptz.jpg' },
                 { id: 'glac-west-entrance', name: 'West Entrance', url: 'https://www.nps.gov/webcams-glac/WestEntrance.jpg' },
@@ -536,14 +593,27 @@
               area: 'Logan Pass',
               cameras: [
                 { id: 'glac-loganpass-lot', name: 'Logan Pass Parking Lot', url: 'https://glacier.org/webcam/lpp_nps.jpg' },
+                { id: 'glac-hidden-lake', name: 'Hidden Lake Trailhead', url: 'https://glacier.org/webcam/hlt_nps.jpg' },
+                { id: 'glac-stmary-valley', name: 'St. Mary Valley', url: 'https://glacier.org/webcam/smv_nps.jpg' },
               ],
             },
             {
               area: 'East Side',
               cameras: [
                 { id: 'glac-many-glacier', name: 'Many Glacier', url: 'https://glacier.org/webcam/mg_nps.jpg' },
+                { id: 'glac-many-glacier-2', name: 'Many Glacier (PTZ)', url: 'https://www.nps.gov/webcams-glac/ManyGlacierPTZ.jpg', off: true },
                 { id: 'glac-stmary', name: 'St. Mary Visitor Center', url: 'https://www.nps.gov/webcams-glac/StMaryPTZ.jpg' },
+                { id: 'glac-stmary-osprey', name: 'St. Mary Osprey Nest', url: 'https://www.nps.gov/webcams-glac/osprey.jpg', off: true },
+                { id: 'glac-dusty-star', name: 'Dusty Star Observatory Sky Cam', url: 'https://glacier.org/webcam/dark_sky_nps.jpg' },
+                { id: 'glac-night-sky', name: 'St. Mary Night Sky', url: 'https://www.nps.gov/webcams-glac/stmaryallsky-resize.jpg' },
                 { id: 'glac-two-medicine', name: 'Two Medicine', url: 'https://www.nps.gov/webcams-glac/TwoMedicine.jpg' },
+              ],
+            },
+            {
+              area: 'Seasonal Wildlife',
+              cameras: [
+                { id: 'glac-squirrel', name: 'Columbian Ground Squirrels', url: 'https://www.nps.gov/webcams-glac/squirrel.jpg', off: true },
+                { id: 'glac-goats', name: 'Mountain Goat Kids', url: 'https://www.nps.gov/webcams-glac/snowball.jpg', off: true },
               ],
             },
           ],
@@ -561,14 +631,13 @@
             {
               area: 'Lake Crescent',
               cameras: [
-                { id: 'olym-crescent', name: 'Lake Crescent (Air Quality)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/olymlarge.jpg' },
+                { id: 'olym-crescent', name: 'Lake Crescent (Air Quality · daytime only)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/olymlarge.jpg' },
               ],
             },
             {
               area: 'Coast',
               cameras: [
                 { id: 'olym-kalaloch', name: 'Kalaloch Beach', url: 'https://pixelcaster.com/dnc-kalaloch/kalaloch.jpg' },
-                { id: 'olym-james', name: 'First Beach / James Island', url: 'https://forkswa.com/wp-content/uploads/2022/09/wavestop.jpg' },
               ],
             },
           ],
@@ -579,7 +648,15 @@
             {
               area: 'Park Views',
               cameras: [
-                { id: 'dena-ard', name: 'Denali (Air Quality)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/denalarge.jpg' },
+                { id: 'dena-ard', name: 'Denali (Air Quality · daytime only)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/denalarge.jpg' },
+              ],
+            },
+            {
+              area: 'More Cameras',
+              cameras: [
+                { id: 'dena-alpine', name: 'Alpine Tundra', url: 'https://www.nps.gov/webcams-dena/alpine.jpg', off: true },
+                { id: 'dena-depot', name: 'Alaska Railroad Depot', url: 'https://www.nps.gov/webcams-dena/train.jpg', off: true },
+                { id: 'dena-puppies', name: 'Sled Dog Puppies', url: 'https://www.nps.gov/webcams-dena/pupimage.jpg', off: true },
               ],
             },
           ],
@@ -628,6 +705,8 @@
                 { id: 'grca-south-entrance', name: 'South Entrance Station', url: 'https://www.nps.gov/webcams-grca/camera.jpg' },
                 { id: 'grca-kolb', name: 'View from Kolb Studio', url: 'https://cdn.pixelcaster.com/public.pixelcaster.com/snapshots/grandcanyon-2/latest.jpg' },
                 { id: 'grca-brightangel', name: 'Bright Angel Trailhead', url: 'https://cdn.pixelcaster.com/public.pixelcaster.com/snapshots/grandcanyon-1/latest.jpg' },
+                { id: 'grca-yavapai', name: 'Yavapai Point (Air Quality · daytime only)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/grcalarge.jpg' },
+                { id: 'grca-sf-peaks', name: 'San Francisco Peaks (NWS)', url: 'https://www.weather.gov/images/fgz/webcam/camera1.jpg' },
               ],
             },
           ],
@@ -636,12 +715,18 @@
           park: 'Great Smoky Mountains',
           areas: [
             {
-              area: 'Air Quality Cams',
+              area: 'Air Quality Cams (daytime only)',
               cameras: [
                 { id: 'grsm-kuwohi', name: 'Kuwohi (Clingmans Dome)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/grcdlarge.jpg' },
                 { id: 'grsm-newfound', name: 'Newfound Gap', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/gsnglarge.jpg' },
                 { id: 'grsm-purchase', name: 'Purchase Knob', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/grpklarge.jpg' },
                 { id: 'grsm-lookrock', name: 'Look Rock', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/grsmlarge.jpg' },
+              ],
+            },
+            {
+              area: 'Live Cameras',
+              cameras: [
+                { id: 'grsm-newfound-live', name: 'Newfound Gap (Live)', url: 'https://grsmnfgap.air-resource.net/gsng.jpg' },
               ],
             },
           ],
@@ -654,7 +739,37 @@
               cameras: [
                 { id: 'havo-v2', name: 'Halemaʻumaʻu — East Rim', url: 'https://volcanoes.usgs.gov/cams/V2cam/images/M.jpg' },
                 { id: 'havo-s2', name: 'Halemaʻumaʻu — West View', url: 'https://volcanoes.usgs.gov/cams/S2cam/images/M.jpg' },
+                { id: 'havo-v1', name: 'Halemaʻumaʻu — West Vent & Lava Lake', url: 'https://volcanoes.usgs.gov/observatories/hvo/cams/V1cam/images/M.jpg' },
                 { id: 'havo-k2', name: 'Kaluapele from Uēkahuna Bluff', url: 'https://volcanoes.usgs.gov/observatories/hvo/cams/K2cam/images/M.jpg' },
+                { id: 'havo-kp', name: 'Summit from Mauna Loa Strip Road', url: 'https://volcanoes.usgs.gov/cams/KPcam/images/M.jpg' },
+              ],
+            },
+            {
+              area: 'Kīlauea Rift Zones',
+              cameras: [
+                { id: 'havo-mitd', name: 'Upper Southwest Rift Zone', url: 'https://volcanoes.usgs.gov/cams/MITDcam/images/M.jpg' },
+                { id: 'havo-mu', name: 'Maunaulu', url: 'https://volcanoes.usgs.gov/observatories/hvo/cams/MUcam/images/M.jpg' },
+                { id: 'havo-pw', name: 'Puʻuʻōʻō — West Flank', url: 'https://volcanoes.usgs.gov/observatories/hvo/cams/PWcam/images/M.jpg' },
+                { id: 'havo-pe', name: 'Puʻuʻōʻō — East Flank', url: 'https://volcanoes.usgs.gov/observatories/hvo/cams/PEcam/images/M.jpg' },
+                { id: 'havo-r3', name: 'Puʻuʻōʻō — Southeast Coast', url: 'https://volcanoes.usgs.gov/observatories/hvo/cams/R3cam/images/M.jpg' },
+                { id: 'havo-s1', name: 'Southwest Rift Zone (Live)', url: 'https://volcanoes.usgs.gov/observatories/hvo/cams/S1cam/images/M.jpg' },
+              ],
+            },
+            {
+              area: 'Mauna Loa',
+              cameras: [
+                { id: 'havo-ml', name: 'Mokuʻāweoweo Caldera — Northwest Rim', url: 'https://volcanoes.usgs.gov/observatories/hvo/cams/MLcam/images/M.jpg' },
+                { id: 'havo-mt', name: 'Mokuʻāweoweo Caldera — Thermal', url: 'https://volcanoes.usgs.gov/observatories/hvo/cams/MTcam/images/M.jpg' },
+                { id: 'havo-mk', name: 'Summit & NE Rift Zone (from Mauna Kea)', url: 'https://volcanoes.usgs.gov/observatories/hvo/cams/MKcam/images/M.jpg' },
+                { id: 'havo-m3', name: 'Upper Southwest Rift Zone', url: 'https://volcanoes.usgs.gov/observatories/hvo/cams/M3cam/images/M.jpg' },
+                { id: 'havo-mdl', name: 'Upper-Middle Southwest Rift Zone', url: 'https://volcanoes.usgs.gov/cams/MDLcam/images/M.jpg' },
+                { id: 'havo-m2', name: 'Middle Southwest Rift Zone', url: 'https://volcanoes.usgs.gov/observatories/hvo/cams/M2cam/images/M.jpg' },
+              ],
+            },
+            {
+              area: 'Hualālai',
+              cameras: [
+                { id: 'havo-hl', name: 'Northwest Flank', url: 'https://volcanoes.usgs.gov/cams/HLcam/images/M.jpg' },
               ],
             },
           ],
@@ -675,6 +790,8 @@
               area: 'Park Views',
               cameras: [
                 { id: 'yose-badger', name: 'Badger Pass Ski Area', url: 'https://pixelcaster.com/aramark/yosemite-ski.jpg' },
+                { id: 'yose-tuolumne', name: 'Tuolumne Meadows (summer only)', url: 'https://pixelcaster.com/aramark/tuolumne.jpg' },
+                { id: 'yose-wawona', name: 'Wawona Dome', url: 'https://cdn.pixelcaster.com/public.pixelcaster.com/snapshots/yosemite-wawona/latest_1920x.jpg' },
                 { id: 'yose-happyisles', name: 'Merced River at Happy Isles', url: 'https://usgs-nims-images.s3.amazonaws.com/overlay/CA_Merced_River_at_Happy_Isles_Bridge_Yosemite/CA_Merced_River_at_Happy_Isles_Bridge_Yosemite_newest.jpg' },
               ],
             },
@@ -687,6 +804,8 @@
               area: 'Park Views',
               cameras: [
                 { id: 'acad-jordan', name: 'Jordan Pond', url: 'https://barharborcam.com/webcams/jordanpond/jordanpond.jpg' },
+                { id: 'acad-eye', name: 'Eye on Acadia', url: 'https://www.nps.gov/webcams-acad/eye.jpg' },
+                { id: 'acad-mcfarland', name: 'McFarland Hill (Air Quality · daytime only)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/acadlarge.jpg' },
               ],
             },
           ],
@@ -698,6 +817,277 @@
               area: 'Park Views',
               cameras: [
                 { id: 'zion-temples', name: 'Temples and Towers of the Virgin', url: 'https://www.nps.gov/webcams-zion/camera2.jpg' },
+                { id: 'zion-southgate', name: 'South Gate Entrance', url: 'https://www.nps.gov/webcams-zion/southgate.jpg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Arches',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'arch-entrance', name: 'Entrance Station', url: 'https://www.nps.gov/webcams-arch/arch_traffic.jpg' },
+                { id: 'arch-udot', name: 'UDOT Traffic Camera', url: 'https://udottraffic.utah.gov/1_devices/aux16852.jpeg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Big Bend',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'bibe-panther-junction', name: 'Panther Junction (Air Quality \u00b7 daytime only)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/bibelarge.jpg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Black Canyon of the Gunnison',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'blca-grizzly-ridge', name: 'Grizzly Ridge', url: 'https://www.nps.gov/webcams-blca/sr2.jpg', off: true },
+                { id: 'blca-gunnison-point', name: 'Gunnison Point', url: 'https://www.nps.gov/webcams-blca/srvc2.jpg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Bryce Canyon',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'brca-air-quality', name: 'Bryce Canyon (Air Quality \u00b7 daytime only)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/brdalarge.jpg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Death Valley',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'deva-devils-hole-pupfish', name: 'Devils Hole Pupfish', url: 'https://www.nps.gov/webcams-deva/devils_hole_pupfish_cam.jpg', off: true },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Glacier Bay',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'glba-tlingit-trail', name: 'Bartlett Cove Dock and Tlingit Trail', url: 'https://www.nps.gov/webcams-glba/TlingitTrail.jpg' },
+                { id: 'glba-bartlett-lagoon', name: 'Bartlett Cove Lagoon and Fairweather Range', url: 'https://www.nps.gov/webcams-glba/BartlettLagoon.jpg' },
+                { id: 'glba-bartlett-dock', name: 'Bartlett Cove Public Dock', url: 'https://www.nps.gov/webcams-glba/BartlettDock.jpg' },
+                { id: 'glba-lower-bay', name: 'Lower Glacier Bay', url: 'https://www.nps.gov/webcams-glba/LowerBay.jpg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Great Sand Dunes',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'grsa-visitor-center', name: 'Visitor Center', url: 'https://www.nps.gov/webcams-grsa/img001.jpg', off: true },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Guadalupe Mountains',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'gumo-dog-canyon', name: 'Dog Canyon View', url: 'https://www.nps.gov/webcams-gumo/gumo3.jpg' },
+                { id: 'gumo-el-capitan', name: 'El Capitan View', url: 'https://www.nps.gov/webcams-gumo/gumo2.jpg' },
+                { id: 'gumo-mckittrick-canyon', name: 'McKittrick Canyon View', url: 'https://www.nps.gov/webcams-gumo/gumo4.jpg' },
+                { id: 'gumo-mckittrick-lot', name: 'McKittrick Parking Lot', url: 'https://www.nps.gov/webcams-gumo/gumo5.jpg' },
+                { id: 'gumo-pine-springs', name: 'Pine Springs Canyon View', url: 'https://www.nps.gov/webcams-gumo/gumo1.jpg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Haleak\u0101la',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'hale-crater', name: 'Haleak\u0101la Crater', url: 'https://www.nps.gov/webcams-hale/HaleSummitCamCrater.jpg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Isle Royale',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'isro-greenstone-ne', name: 'Greenstone Ridge Northeast', url: 'https://www.nps.gov/webcams-isro/greenstoneridgene.jpg' },
+                { id: 'isro-greenstone-sw', name: 'Greenstone Ridge Southwest', url: 'https://www.nps.gov/webcams-isro/GreenstoneRidgeSW.jpg' },
+                { id: 'isro-middle-islands', name: 'Middle Islands Passage', url: 'https://www.nps.gov/webcams-isro/middleislands.jpg' },
+                { id: 'isro-mott-dock', name: 'Mott Island Dock', url: 'https://www.nps.gov/webcams-isro/mottmain.jpg' },
+                { id: 'isro-mott-sw', name: 'Mott Island Southwest', url: 'https://www.nps.gov/webcams-isro/mottsw.jpg' },
+                { id: 'isro-north-shore', name: 'North Shore', url: 'https://www.nps.gov/webcams-isro/northshore.jpg' },
+                { id: 'isro-rock-harbor', name: 'Rock Harbor', url: 'https://www.nps.gov/webcams-isro/tobin.jpg' },
+                { id: 'isro-smithwick', name: 'Smithwick Channel', url: 'https://www.nps.gov/webcams-isro/smithwick.jpg' },
+                { id: 'isro-tobin-harbor', name: 'Tobin Harbor', url: 'https://www.nps.gov/webcams-isro/tobinseaplanelz.jpg' },
+                { id: 'isro-windigo', name: 'Windigo', url: 'https://www.nps.gov/webcams-isro/WashingtonHarbor.jpg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Joshua Tree',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'jotr-belle-mountain', name: 'View from Belle Mountain (Air Quality \u00b7 daytime only)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/jotrlarge.jpg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Lassen Volcanic',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'lavo-kyvc', name: 'Kohm Yah-mah-nee Visitor Center', url: 'https://www.nps.gov/webcams-lavo/kyvc_webcam1.jpg' },
+                { id: 'lavo-manzanita', name: 'Manzanita Lake', url: 'https://www.nps.gov/webcams-lavo/ml_webcam.jpg', off: true },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Mammoth Cave',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'maca-green-river', name: 'Green River Bluffs (Air Quality \u00b7 daytime only)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/macalarge.jpg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Mesa Verde',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'meve-spruce-tree', name: 'Spruce Tree House', url: 'https://www.nps.gov/webcams-meve/sprucetree000M.jpg', off: true },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'New River Gorge',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'neri-canyon-rim', name: 'Canyon Rim', url: 'https://www.nps.gov/webcams-neri/image.jpg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Sequoia & Kings Canyon',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'seki-giant-forest', name: 'Giant Forest (Air Quality \u00b7 daytime only)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/sekilarge.jpg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Shenandoah',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'shen-big-meadows', name: 'Big Meadows', url: 'https://www.nps.gov/webcams-shen/bvc2.jpg' },
+                { id: 'shen-mountain-view', name: 'Mountain View', url: 'https://phenocam.nau.edu/data/latest/shenandoah.jpg' },
+              ],
+            },
+            {
+              area: 'Live Streams',
+              cameras: [
+                { id: 'shen-valley-live', name: 'Shenandoah Valley (Live)', type: 'stream', embed: 'https://portal.hdontap.com/s/embed/?stream=shenandoah_np-snpa_office-ptz-CUST&ratio=16:9&fluid=true' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Wrangell-St. Elias',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'wrst-kennecott-mill', name: 'Kennecott Mill and Mt. Blackburn', url: 'https://www.nps.gov/webcams-wrst/KennecottNorth.jpg' },
+                { id: 'wrst-kennicott-glacier', name: 'Kennicott Glacier and the Chugach Range', url: 'https://www.nps.gov/webcams-wrst/KennecottSouth.jpg' },
+                { id: 'wrst-hq', name: 'Wrangell Mountains from Park Headquarters', url: 'https://www.nps.gov/webcams-wrst/HQVC.jpg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Katmai',
+          areas: [
+            {
+              area: 'Bear Cams',
+              cameras: [
+                { id: 'katm-brooks-falls', name: 'Brooks Falls Bearcam', type: 'stream', embed: 'https://www.youtube.com/embed/J7ZrIDvqlic' },
+                { id: 'katm-brooks-low', name: 'Brooks Falls — Lower River', type: 'stream', embed: 'https://www.youtube.com/embed/EwTH5yY7Mks' },
+                { id: 'katm-riffles', name: 'Riffles Bearcam', type: 'stream', embed: 'https://www.youtube.com/embed/z7_GhJeFxQI' },
+                { id: 'katm-river-watch', name: 'River Watch Cam', type: 'stream', embed: 'https://www.youtube.com/embed/wkVLYfU-Kew' },
+                { id: 'katm-naknek', name: 'Naknek River Cam', type: 'stream', embed: 'https://www.youtube.com/embed/mfm9cjg6Khw' },
+                { id: 'katm-dumpling', name: 'Dumpling Mountain Cam', type: 'stream', embed: 'https://www.youtube.com/embed/uLgdUiT9WZQ' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Carlsbad Caverns',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'cave-bat', name: 'Natural Entrance (Bat Cam)', type: 'stream', embed: 'https://www.youtube.com/embed/BwiIsjXt3KI' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Channel Islands',
+          areas: [
+            {
+              area: 'Live Streams',
+              cameras: [
+                { id: 'chis-live', name: 'Channel Islands Live Broadcasts', type: 'stream', embed: 'https://www.youtube.com/embed/fduuCS3xToE' },
+                { id: 'chis-ocean', name: 'Ocean Webcam', type: 'stream', embed: 'https://www.youtube.com/embed/OAJF1Ie1m_Q' },
+                { id: 'chis-anacapa', name: 'Anacapa Island Webcam', type: 'stream', embed: 'https://www.youtube.com/embed/aaUERtNMn7o' },
+                { id: 'chis-sanmiguel', name: 'San Miguel Island Ranger Station', type: 'stream', embed: 'https://www.youtube.com/embed/OtbWimuJQ_A' },
+                { id: 'chis-peregrine', name: 'Peregrine Falcon Webcam', type: 'stream', embed: 'https://www.youtube.com/embed/YmZv8Pfwum4' },
+                { id: 'chis-eagle-sauces', name: 'Bald Eagle — Sauces Canyon Nest', type: 'stream', embed: 'https://www.youtube.com/embed/rnTsOesC6hE' },
+                { id: 'chis-eagle-fraser', name: 'Bald Eagle — Fraser Point Nest', type: 'stream', embed: 'https://www.youtube.com/embed/OY4V_AppZ6s' },
               ],
             },
           ],
@@ -756,18 +1146,103 @@
       const brandSub = document.getElementById('brandSub');
 
       const stageImage = document.getElementById('stageImage');
+      const stageStream = document.getElementById('stageStream');
+      const stageBadge = document.getElementById('stageBadge');
       const stageTitle = document.getElementById('stageTitle');
       const stageArea = document.getElementById('stageArea');
       const stageCount = document.getElementById('stageCount');
       const stageRefresh = document.getElementById('stageRefresh');
       const stageSave = document.getElementById('stageSave');
+      const stageWatch = document.getElementById('stageWatch');
       const stageFav = document.getElementById('stageFav');
       const sideList = document.getElementById('sideList');
+      const searchInput = document.getElementById('searchInput');
+      const chipOffline = document.getElementById('chipOffline');
+      const chipStreams = document.getElementById('chipStreams');
 
       let activeId = null;   // null = grid view
       let remaining = 0;
 
+      // ---------- Search & filters ----------
+      let searchText = '';
+      let hideOffline = false;
+      let streamsOnly = false;
+      function passesFilters(cam) {
+        if (hideOffline && cam.off) return false;
+        if (streamsOnly && cam.type !== 'stream') return false;
+        if (searchText && !((cam.name + ' ' + parkNameOf(cam.id)).toLowerCase().includes(searchText))) return false;
+        return true;
+      }
+
+      // ---------- Session + shareable URL state ----------
+      const STATE_KEY = 'nps-webcam-state';
+      function parkSlug(name) {
+        return name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      }
+      function parkIndexBySlug(slug) { return PARKS.findIndex(p => parkSlug(p.park) === slug); }
+      function saveSession() {
+        try { localStorage.setItem(STATE_KEY, JSON.stringify({ park: parkSlug(PARKS[parkIndex].park), interval: intervalInput.value })); } catch (e) {}
+      }
+      // Browser history: pushState on navigation so Back/Forward work; replace
+      // (or skip) when re-applying an existing entry to avoid loops.
+      let suppressHistory = false;
+      function updateHash() {
+        const base = parkSlug(PARKS[parkIndex].park);
+        const h = '#' + (activeId ? base + '/' + activeId : base);
+        if (location.hash === h) return;
+        const depth = (history.state && history.state.d) || 0;
+        if (suppressHistory) history.replaceState({ d: depth }, '', h);
+        else history.pushState({ d: depth + 1 }, '', h);
+      }
+      function showParkGrid(i) {
+        if (i !== -1 && i !== parkIndex) {
+          parkIndex = i; AREAS = PARKS[i].areas;
+          parkSelect.value = String(i); brandSub.textContent = PARKS[i].park;
+        }
+        openGrid();
+      }
+      // Show the view described by the current URL hash (used on Back/Forward).
+      function applyHashState() {
+        const hash = location.hash.slice(1);
+        if (hash) {
+          const parts = hash.split('/');
+          if (parts[1] && camById(parts[1])) {
+            const cam = camById(parts[1]);
+            if (cam.type === 'stream' && !canEmbedInline(cam)) showParkGrid(parkIndexOf(parts[1]));
+            else openDetail(parts[1]);
+            return;
+          }
+          const i = parkIndexBySlug(parts[0]);
+          if (i !== -1) { showParkGrid(i); return; }
+        }
+        openGrid();
+      }
+      window.addEventListener('popstate', () => {
+        suppressHistory = true;
+        if (searchText) { searchText = ''; searchInput.value = ''; }
+        applyHashState();
+        suppressHistory = false;
+      });
+
       function bust(url) { return url.split('?')[0] + '?' + Date.now(); }
+
+      // Live-video streams (YouTube/angelcam/HDOnTap): the grid shows a lightweight
+      // poster; clicking embeds the live player inline in the detail view. YouTube
+      // live embeds need a real (non-file) origin, so from file:// they open on
+      // YouTube instead of showing an inline "Error 153".
+      function ytId(u) { const m = (u || '').match(/embed\/([\w-]+)/); return m ? m[1] : null; }
+      function streamPoster(cam) { const id = ytId(cam.embed); return id ? 'https://img.youtube.com/vi/' + id + '/hqdefault.jpg' : null; }
+      function streamWatch(cam) { const id = ytId(cam.embed); return id ? 'https://www.youtube.com/watch?v=' + id : cam.embed; }
+      // Embed URL for inline playback in the stage (autoplay muted where supported).
+      function streamEmbedSrc(cam) {
+        const u = cam.embed || '';
+        let s = u + (u.includes('?') ? '&' : '?') + 'autoplay=1&mute=1';
+        if (ytId(cam.embed) && location.protocol !== 'file:') s += '&origin=' + encodeURIComponent(location.origin);
+        return s;
+      }
+      // YouTube live embeds only work from a real http(s) origin.
+      function canEmbedInline(cam) { return !ytId(cam.embed) || location.protocol !== 'file:'; }
 
       function intervalSeconds() {
         let s = parseInt(intervalInput.value, 10);
@@ -781,13 +1256,14 @@
       const retryState = {};   // id -> { tries, timer }
       const lastGoodSrc = {};  // id -> most recently loaded frame URL (for instant swaps)
 
-      function registerImg(id, imgEl, onOk, onFail) {
-        (imgRefs[id] = imgRefs[id] || []).push({ el: imgEl, onOk: onOk, onFail: onFail });
+      function registerImg(id, imgEl, onOk, onFail, badgeEl) {
+        (imgRefs[id] = imgRefs[id] || []).push({ el: imgEl, onOk: onOk, onFail: onFail, badge: badgeEl || null });
         // Show the cached frame immediately so swaps feel instant.
         if (lastGoodSrc[id]) {
           imgEl.src = lastGoodSrc[id];
           if (onOk) onOk();
         }
+        applyBadge(id);
       }
 
       function clearImgRefs() {
@@ -800,13 +1276,77 @@
 
       const SHOW_AFTER = 3; // show overlay only after this many consecutive fails
 
+      // ---------- Freshness badges ----------
+      // A frame's capture time (Last-Modified) can only be read for hosts that
+      // send CORS headers; the browser blocks it for the rest. So we measure the
+      // real age where we can, flag the known daytime-only air-quality cams by
+      // URL, and otherwise assume the feed is live.
+      const AIRQUALITY_RE = /featurecontent\/ard\/webcams/i;
+      const AGE_READABLE_RE = /volcanoes\.usgs\.gov|cdn\.pixelcaster\.com/i;
+      const STALE_MS = 60 * 60 * 1000;   // frames older than 1h count as stale
+      const AGE_CHECK_MS = 60 * 1000;    // re-measure a given cam at most this often
+      const ageInfo = {};                // id -> { at, ms } ; ms = last measured age
+
+      function humanAge(ms) {
+        const m = Math.round(ms / 60000);
+        if (m < 60) return m + 'm';
+        const h = Math.round(m / 60);
+        return h < 24 ? h + 'h' : Math.round(h / 24) + 'd';
+      }
+
+      function setBadge(el, state, label) {
+        if (!el) return;
+        el.classList.remove('warn', 'bad', 'stream');
+        if (state === 'offline') el.classList.add('bad');
+        else if (state === 'stream') el.classList.add('stream');
+        else if (state !== 'live') el.classList.add('warn');
+        const lab = el.querySelector('.badge-label');
+        if (lab) lab.textContent = label;
+      }
+
+      // Resting badge for a camera. (Offline is applied separately on load failure.)
+      function applyBadge(id) {
+        const cam = camById(id);
+        if (!cam) return;
+        const rec = ageInfo[id];
+        let state = 'live', label = 'Live';
+        if (cam.off) {
+          // NPS lists this camera as inactive.
+          state = 'offline'; label = 'Offline';
+        } else if (rec && rec.ms != null && rec.ms > STALE_MS) {
+          state = 'stale'; label = 'Stale · ' + humanAge(rec.ms);
+        } else if ((!rec || rec.ms == null) && AIRQUALITY_RE.test(cam.url)) {
+          state = 'daytime'; label = 'Daytime';
+        }
+        (imgRefs[id] || []).forEach(r => setBadge(r.badge, state, label));
+      }
+
+      // For CORS-readable hosts, HEAD the frame and read Last-Modified to get its
+      // true age. Throttled per camera; silently skips hosts that block CORS.
+      function checkAge(id) {
+        const cam = camById(id);
+        if (!cam || !AGE_READABLE_RE.test(cam.url)) return;
+        const now = Date.now();
+        const rec = ageInfo[id];
+        if (rec && now - rec.at < AGE_CHECK_MS) return;
+        ageInfo[id] = { at: now, ms: rec ? rec.ms : null };
+        fetch(bust(cam.url), { method: 'HEAD', cache: 'no-store' })
+          .then(r => {
+            const lm = r.headers.get('last-modified');
+            if (!lm) return;
+            ageInfo[id] = { at: Date.now(), ms: Date.now() - new Date(lm).getTime() };
+            applyBadge(id);
+          })
+          .catch(() => {});
+      }
+
       // Preload the next frame off-screen; only swap it into the visible <img>
       // elements once it has fully loaded. A failed cache-busted fetch never
       // wipes the last good frame, and the overlay only shows before the first
       // successful load.
       function refreshCamera(id) {
         const cam = camById(id);
-        if (!cam) return;
+        if (!cam || cam.type === 'stream') return;
         const refs = imgRefs[id] || [];
         if (!refs.length) return;
 
@@ -821,6 +1361,8 @@
             r.el.src = src;
             if (r.onOk) r.onOk();
           });
+          applyBadge(id);
+          checkAge(id);
         };
         loader.onerror = () => {
           state.tries += 1;
@@ -828,6 +1370,7 @@
           const neverLoaded = refs.every(r => !r.el.naturalWidth);
           if (neverLoaded && state.tries >= SHOW_AFTER) {
             refs.forEach(r => { if (r.onFail) r.onFail(); });
+            refs.forEach(r => setBadge(r.badge, 'offline', 'Offline'));
           }
           const delay = Math.min(700 * state.tries, 5000);
           if (state.timer) clearTimeout(state.timer);
@@ -837,11 +1380,10 @@
       }
 
       function refreshAll() {
-        // Current park cameras plus any global favorites (which may live in
-        // other parks but are shown in the Favorites section).
-        const ids = new Set(currentCameras().map(c => c.id));
-        favorites.forEach(id => ids.add(id));
-        ids.forEach(id => refreshCamera(id));
+        // Refresh every camera that currently has a visible <img> registered
+        // (current park, favorites, sidebar, or search results). Streams have no
+        // registered image, so they are naturally skipped.
+        Object.keys(imgRefs).forEach(id => refreshCamera(id));
       }
 
 
@@ -854,22 +1396,32 @@
         card.className = 'card';
         const subtitle = showPark
           ? parkNameOf(cam.id) + ' · ' + areaOf(cam.id)
-          : 'live';
+          : (cam.type === 'stream' ? 'live stream' : 'live');
+        const isStream = cam.type === 'stream';
+        const poster = isStream ? streamPoster(cam) : null;
+        const media = isStream
+          ? (poster ? '<img alt="' + cam.name + '" src="' + poster + '" />' : '<span class="noposter"></span>') +
+            '<span class="playbtn"></span>'
+          : '<img alt="' + cam.name + '" /><div class="imgError" hidden>Unavailable</div>';
+        const badgeHtml = isStream
+          ? '<span class="badge stream"><span class="dot"></span> <span class="badge-label">Stream</span></span>'
+          : '<span class="badge"><span class="dot"></span> <span class="badge-label">Live</span></span>';
         card.innerHTML =
-          '<div class="thumb">' +
-            '<span class="badge"><span class="dot"></span> Live</span>' +
+          '<div class="thumb">' + badgeHtml +
             '<button class="star' + (isFav(cam.id) ? ' on' : '') + '" title="Pin to favorites">' + STAR + '</button>' +
-            '<img alt="' + cam.name + '" />' +
-            '<div class="imgError" hidden>Unavailable</div>' +
+            media +
           '</div>' +
           '<div class="meta">' +
             '<span class="name">' + cam.name + '</span>' +
             '<span class="time">' + subtitle + '</span>' +
           '</div>';
-        const img = card.querySelector('img');
-        const err = card.querySelector('.imgError');
         const star = card.querySelector('.star');
-        registerImg(cam.id, img, () => { err.hidden = true; }, () => { err.hidden = false; });
+        if (!isStream) {
+          const img = card.querySelector('img');
+          const err = card.querySelector('.imgError');
+          const badge = card.querySelector('.badge');
+          registerImg(cam.id, img, () => { err.hidden = true; }, () => { err.hidden = false; }, badge);
+        }
         star.addEventListener('click', (e) => {
           e.stopPropagation();
           toggleFav(cam.id);
@@ -879,40 +1431,52 @@
         return card;
       }
 
+      function gridSection(title, cams, showPark) {
+        const section = document.createElement('div');
+        section.className = 'area';
+        const heading = document.createElement('h2');
+        heading.className = 'area-title';
+        heading.textContent = title;
+        section.appendChild(heading);
+        const row = document.createElement('div');
+        row.className = 'area-grid';
+        cams.forEach(cam => row.appendChild(makeCard(cam, showPark)));
+        section.appendChild(row);
+        return section;
+      }
+
+      function gridEmpty(msg) {
+        const d = document.createElement('div');
+        d.className = 'empty';
+        d.textContent = msg;
+        grid.appendChild(d);
+      }
+
       function buildGrid() {
         grid.innerHTML = '';
 
-        // Favorites section (only when there are any).
-        const favs = favCameras();
-        if (favs.length) {
-          const section = document.createElement('div');
-          section.className = 'area';
-          const heading = document.createElement('h2');
-          heading.className = 'area-title';
-          heading.textContent = '★ Favorites';
-          section.appendChild(heading);
-          const row = document.createElement('div');
-          row.className = 'area-grid';
-          favs.forEach(cam => row.appendChild(makeCard(cam, true)));
-          section.appendChild(row);
-          grid.appendChild(section);
+        // Search mode: match cameras across every park, grouped by park.
+        if (searchText) {
+          let total = 0;
+          PARKS.forEach(p => {
+            const cams = p.areas.flatMap(a => a.cameras).filter(passesFilters);
+            if (cams.length) { total += cams.length; grid.appendChild(gridSection(p.park, cams, true)); }
+          });
+          if (!total) gridEmpty('No cameras match “' + searchText + '”.');
+          return;
         }
 
+        // Favorites section (filtered).
+        const favs = favCameras().filter(passesFilters);
+        if (favs.length) grid.appendChild(gridSection('★ Favorites', favs, true));
+
+        // Current park, grouped by area (filtered).
+        let shown = favs.length;
         AREAS.forEach(group => {
-          const section = document.createElement('div');
-          section.className = 'area';
-          const heading = document.createElement('h2');
-          heading.className = 'area-title';
-          heading.textContent = group.area;
-          section.appendChild(heading);
-
-          const row = document.createElement('div');
-          row.className = 'area-grid';
-          group.cameras.forEach(cam => row.appendChild(makeCard(cam)));
-
-          section.appendChild(row);
-          grid.appendChild(section);
+          const cams = group.cameras.filter(passesFilters);
+          if (cams.length) { shown += cams.length; grid.appendChild(gridSection(group.area, cams, false)); }
         });
+        if (!shown) gridEmpty('No cameras match the current filters.');
       }
 
       // ---------- Build detail sidebar ----------
@@ -925,7 +1489,12 @@
           (isFav(cam.id) ? '<span class="mini-star">' + STAR + '</span>' : '<span class="dot"></span>') +
           '</div>';
         const img = el.querySelector('img');
-        registerImg(cam.id, img);
+        if (cam.type === 'stream') {
+          const p = streamPoster(cam);
+          if (p) img.src = p;
+        } else {
+          registerImg(cam.id, img);
+        }
         el.addEventListener('click', () => openDetail(cam.id));
         return el;
       }
@@ -957,8 +1526,13 @@
       }
 
       function openDetail(id) {
-        activeId = id;
         const cam = camById(id);
+        // YouTube live embeds fail from file:// (Error 153 — null origin); open on
+        // YouTube instead. Served over http(s) they embed inline in the stage.
+        if (cam && cam.type === 'stream' && !canEmbedInline(cam)) {
+          window.open(streamWatch(cam), '_blank', 'noopener'); return;
+        }
+        activeId = id;
         // If this camera lives in another park (e.g. opened from a global
         // favorite), switch the park context so the sidebar/refresh match.
         const pIdx = parkIndexOf(id);
@@ -972,28 +1546,53 @@
         stageTitle.textContent = cam.name;
         stageArea.textContent = parkNameOf(id) + ' · ' + areaOf(id);
         updateFavBtn();
-        registerImg(id, stageImage);
+        const isStream = cam.type === 'stream';
+        stageSave.hidden = isStream;
+        stageRefresh.hidden = isStream;
+        stageCount.hidden = isStream;
+        stageWatch.hidden = !isStream;
+        if (isStream) {
+          stageImage.hidden = true;
+          stageStream.hidden = false;
+          stageStream.src = streamEmbedSrc(cam);
+          setBadge(stageBadge, 'stream', 'Stream');
+          stageWatch.href = streamWatch(cam);
+          stageWatch.textContent = ytId(cam.embed) ? 'Watch on YouTube ↗' : 'Open live ↗';
+        } else {
+          stageStream.hidden = true;
+          stageStream.removeAttribute('src');
+          stageImage.hidden = false;
+          registerImg(id, stageImage, null, null, stageBadge);
+        }
         buildSidebar();
         gridView.hidden = true;
         detailView.hidden = false;
         backBtn.style.display = 'inline-flex';
         refreshAll();
         resetTimer();
+        updateHash();
+        saveSession();
         window.scrollTo(0, 0);
       }
 
       function openGrid() {
         activeId = null;
         clearImgRefs();
+        if (stageStream) stageStream.removeAttribute('src');
         buildGrid();
         detailView.hidden = true;
         gridView.hidden = false;
         backBtn.style.display = 'none';
         refreshAll();
         resetTimer();
+        updateHash();
+        saveSession();
       }
 
-      backBtn.addEventListener('click', openGrid);
+      backBtn.addEventListener('click', () => {
+        if (history.state && history.state.d > 0) history.back();
+        else openGrid();
+      });
       stageRefresh.addEventListener('click', () => { refreshAll(); resetTimer(); });
       stageFav.addEventListener('click', () => {
         toggleFav(activeId);
@@ -1006,7 +1605,7 @@
       // arrives moments later. Uses the already-loaded src.
       async function saveCurrent() {
         const cam = camById(activeId);
-        if (!cam || !stageImage.src) return;
+        if (!cam || cam.type === 'stream' || !stageImage.src) return;
         const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         const fileName = cam.id + '_' + stamp + '.jpg';
         const url = stageImage.src;
@@ -1070,7 +1669,7 @@
         updateCount();
       }
 
-      intervalInput.addEventListener('change', resetTimer);
+      intervalInput.addEventListener('change', () => { resetTimer(); saveSession(); });
 
       // ---------- Park switching ----------
       function populateParks() {
@@ -1093,14 +1692,70 @@
         parkIndex = parseInt(parkSelect.value, 10) || 0;
         AREAS = PARKS[parkIndex].areas;
         brandSub.textContent = PARKS[parkIndex].park;
+        if (searchText) { searchText = ''; searchInput.value = ''; }
         openGrid(); // return to grid for the newly selected park
       });
 
+      // ---------- Search + filter controls ----------
+      // Re-render the grid for a search/filter change (leaving detail if open).
+      function applyGridChange() {
+        if (activeId !== null) { openGrid(); return; }
+        clearImgRefs();
+        if (stageStream) stageStream.removeAttribute('src');
+        buildGrid();
+        refreshAll();
+        resetTimer();
+      }
+      let searchTimer = null;
+      searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+          const v = searchInput.value.trim().toLowerCase();
+          if (v === searchText) return;
+          searchText = v;
+          applyGridChange();
+        }, 180);
+      });
+      chipOffline.addEventListener('click', () => { hideOffline = !hideOffline; chipOffline.classList.toggle('on', hideOffline); applyGridChange(); });
+      chipStreams.addEventListener('click', () => { streamsOnly = !streamsOnly; chipStreams.classList.toggle('on', streamsOnly); applyGridChange(); });
+
       // ---------- Init ----------
-      populateParks();
-      buildGrid();
-      refreshAll();
-      resetTimer();
+      (function initState() {
+        suppressHistory = true;
+        const hash = location.hash.slice(1);
+        let camId = null, pIdx = null, interval = null;
+        if (hash) {
+          const parts = hash.split('/');
+          if (parts[1] && camById(parts[1])) camId = parts[1];
+          else { const i = parkIndexBySlug(parts[0]); if (i !== -1) pIdx = i; }
+        }
+        if (camId === null && pIdx === null) {
+          try {
+            const s = JSON.parse(localStorage.getItem(STATE_KEY) || '{}');
+            if (s.park) { const i = parkIndexBySlug(s.park); if (i !== -1) pIdx = i; }
+            if (s.interval) interval = s.interval;
+          } catch (e) {}
+        }
+        if (interval) intervalInput.value = interval;
+        if (pIdx !== null) { parkIndex = pIdx; AREAS = PARKS[parkIndex].areas; }
+        populateParks();
+        if (camId) {
+          const cam = camById(camId);
+          if (cam && cam.type === 'stream' && !canEmbedInline(cam)) {
+            const i = parkIndexOf(camId);
+            if (i !== -1) { parkIndex = i; AREAS = PARKS[i].areas; parkSelect.value = String(i); brandSub.textContent = PARKS[i].park; }
+            buildGrid(); refreshAll();
+          } else {
+            openDetail(camId);
+          }
+        } else {
+          buildGrid();
+          refreshAll();
+        }
+        updateHash();
+        suppressHistory = false;
+        resetTimer();
+      })();
       setInterval(tick, 1000);
     })();
   </script>
