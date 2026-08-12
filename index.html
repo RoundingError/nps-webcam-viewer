@@ -163,6 +163,78 @@
     .view { flex: 1; padding: 24px; }
     .view[hidden] { display: none; }
 
+    /* Home view hides park/refresh/filter controls that only apply to a park. */
+    body[data-view="home"] .park-pill,
+    body[data-view="home"] .refresh-pill,
+    body[data-view="home"] #chipOffline,
+    body[data-view="home"] #chipStreams { display: none; }
+    .eyebrow-home {
+      font: inherit;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-weight: 600;
+      background: none;
+      border: 0;
+      padding: 0;
+      cursor: pointer;
+      text-align: left;
+    }
+    .eyebrow-home:hover { color: var(--accent-hover); }
+
+    /* ---------- Home / landing ---------- */
+    .home { display: flex; flex-direction: column; gap: 34px; max-width: 1400px; margin: 0 auto; }
+    .hero {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background:
+        radial-gradient(900px 300px at 15% -40%, rgba(47,129,247,.20), transparent 60%),
+        radial-gradient(700px 260px at 95% -30%, rgba(63,185,80,.16), transparent 60%),
+        var(--panel);
+      padding: 30px 28px;
+    }
+    .hero-title { margin: 0 0 8px; font-size: 30px; font-weight: 750; letter-spacing: .2px; }
+    .hero-sub { margin: 0; max-width: 640px; color: var(--muted); font-size: 15px; line-height: 1.5; }
+    .hero-sub strong { color: var(--text); font-weight: 700; }
+
+    .home-parks .area-title { margin-bottom: 16px; }
+    .park-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 18px;
+    }
+    .park-card {
+      position: relative;
+      aspect-ratio: 4 / 3;
+      border-radius: var(--radius);
+      overflow: hidden;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: #000;
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+    .park-card:hover {
+      transform: translateY(-3px);
+      border-color: #33507e;
+      box-shadow: var(--shadow);
+    }
+    .park-card img {
+      width: 100%; height: 100%;
+      object-fit: cover; display: block;
+      transition: transform .3s ease;
+    }
+    .park-card:hover img { transform: scale(1.05); }
+    .park-card .pc-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,.88) 0%, rgba(0,0,0,.25) 48%, rgba(0,0,0,.05) 100%);
+      pointer-events: none;
+    }
+    .park-card .pc-noimg { position: absolute; inset: 0; background: linear-gradient(135deg,#1b2431,#0d1117); }
+    .park-card .pc-info { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 14px; }
+    .park-card .pc-name { font-size: 15px; font-weight: 700; line-height: 1.2; }
+    .park-card .pc-count { font-size: 11px; color: rgba(255,255,255,.72); margin-top: 2px; font-variant-numeric: tabular-nums; }
+
     /* ---------- Grid (preview) ---------- */
     .grid {
       display: flex;
@@ -246,6 +318,15 @@
       display: flex; align-items: center; justify-content: center; pointer-events: none;
     }
     .thumb .playbtn::after { content: ''; border-style: solid; border-width: 10px 0 10px 17px; border-color: transparent transparent transparent #fff; margin-left: 3px; }
+    /* Pill on stream tiles that open in a new tab (YouTube on file://, HDOnTap). */
+    .thumb .ext-tag {
+      position: absolute; bottom: 10px; right: 10px;
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; font-weight: 600; letter-spacing: .3px;
+      background: rgba(0,0,0,.6); backdrop-filter: blur(4px);
+      color: #cdd7e2; padding: 4px 8px; border-radius: 999px;
+      pointer-events: none;
+    }
 
     /* ---------- Favorite star (on thumbnails) ---------- */
     .star {
@@ -425,7 +506,7 @@
     <div class="topbar">
       <button class="backBtn" id="backBtn">&larr; All cameras</button>
       <div class="brand">
-        <span class="eyebrow">National Park Webcams</span>
+        <button class="eyebrow eyebrow-home" id="homeLink" title="Back to all parks">National Park Webcams</button>
         <h1 id="brandTitle"><a id="brandSub" target="_blank" rel="noopener">Live views</a></h1>
       </div>
       <label class="pill search">
@@ -434,11 +515,11 @@
       </label>
       <button class="chip" id="chipOffline" title="Hide cameras NPS lists as inactive">Hide offline</button>
       <button class="chip" id="chipStreams" title="Show only live video streams">Streams</button>
-      <span class="pill">
+      <span class="pill park-pill">
         Park
         <select id="parkSelect"></select>
       </span>
-      <span class="pill">
+      <span class="pill refresh-pill">
         <span class="dot"></span>
         Refresh
         <select id="interval">
@@ -455,8 +536,25 @@
       </span>
     </div>
 
+    <!-- Home / landing -->
+    <section class="view" id="homeView">
+      <div class="home">
+        <div class="hero">
+          <h2 class="hero-title">The national parks, live.</h2>
+          <p class="hero-sub">Refreshing views from <strong id="statCams">…</strong> webcams across
+          <strong id="statParks">…</strong> national parks — geysers, glaciers, coastlines,
+          wildlife and more.</p>
+        </div>
+        <div id="homeFavorites"></div>
+        <div class="home-parks">
+          <h2 class="area-title">All parks</h2>
+          <div class="park-grid" id="parkGrid"></div>
+        </div>
+      </div>
+    </section>
+
     <!-- Grid preview -->
-    <section class="view" id="gridView">
+    <section class="view" id="gridView" hidden>
       <div class="grid" id="grid"></div>
     </section>
 
@@ -865,7 +963,7 @@
               area: 'Cameras',
               cameras: [
                 { id: 'blca-grizzly-ridge', name: 'Grizzly Ridge', url: 'https://www.nps.gov/webcams-blca/sr2.jpg', off: true },
-                { id: 'blca-gunnison-point', name: 'Gunnison Point', url: 'https://www.nps.gov/webcams-blca/srvc2.jpg' },
+                { id: 'blca-gunnison-point', name: 'Gunnison Point', url: 'https://www.nps.gov/webcams-blca/srvc2.jpg', off: true },
               ],
             },
           ],
@@ -1036,7 +1134,7 @@
             {
               area: 'Cameras',
               cameras: [
-                { id: 'shen-big-meadows', name: 'Big Meadows', url: 'https://www.nps.gov/webcams-shen/bvc2.jpg' },
+                { id: 'shen-big-meadows', name: 'Big Meadows', url: 'https://www.nps.gov/webcams-shen/bvc2.jpg', off: true },
                 { id: 'shen-mountain-view', name: 'Mountain View', url: 'https://phenocam.nau.edu/data/latest/shenandoah.jpg' },
               ],
             },
@@ -1044,6 +1142,7 @@
               area: 'Live Streams',
               cameras: [
                 { id: 'shen-valley-live', name: 'Shenandoah Valley (Live)', type: 'stream', embed: 'https://portal.hdontap.com/s/embed/?stream=shenandoah_np-snpa_office-ptz-CUST&ratio=16:9&fluid=true' },
+                { id: 'shen-big-meadows-live', name: 'Big Meadows (Live)', type: 'stream', embed: 'https://portal.hdontap.com/s/embed/?stream=shenandoah_np-meadow_cam-CUST&ratio=16:9&fluid=true' },
               ],
             },
           ],
@@ -1264,6 +1363,7 @@
         'seki-giant-forest': 'https://www.nps.gov/subjects/air/webcams.htm?site=seki',
         'shen-big-meadows': 'https://www.nps.gov/media/webcam/view.htm?id=81B46B99-1DD8-B71B-0B124A40CC3384CE',
         'shen-mountain-view': 'https://www.nps.gov/media/webcam/view.htm?id=81B46B71-1DD8-B71B-0B55074571E08B1E',
+        'shen-big-meadows-live': 'https://www.nps.gov/media/webcam/view.htm?id=5BA652A1-979D-4485-F22E9F780981BD17',
         'wrst-kennecott-mill': 'https://www.nps.gov/media/webcam/view.htm?id=51F606E1-BAF1-472B-2BC7D21ED4CDA08E',
         'wrst-kennicott-glacier': 'https://www.nps.gov/media/webcam/view.htm?id=5224B014-CBDE-5E14-DEF34EBF65E78E88',
         'wrst-hq': 'https://www.nps.gov/media/webcam/view.htm?id=F91F11B2-C421-28C4-16C717FF1FF2CB72',
@@ -1307,6 +1407,12 @@
       const grid = document.getElementById('grid');
       const gridView = document.getElementById('gridView');
       const detailView = document.getElementById('detailView');
+      const homeView = document.getElementById('homeView');
+      const parkGrid = document.getElementById('parkGrid');
+      const homeFavorites = document.getElementById('homeFavorites');
+      const statParks = document.getElementById('statParks');
+      const statCams = document.getElementById('statCams');
+      const homeLink = document.getElementById('homeLink');
       const backBtn = document.getElementById('backBtn');
       const intervalInput = document.getElementById('interval');
       const parkSelect = document.getElementById('parkSelect');
@@ -1371,9 +1477,14 @@
       // Browser history: pushState on navigation so Back/Forward work; replace
       // (or skip) when re-applying an existing entry to avoid loops.
       let suppressHistory = false;
+      let atHome = false;
       function updateHash() {
-        const base = parkSlug(PARKS[parkIndex].park);
-        const h = '#' + (activeId ? base + '/' + activeId : base);
+        let h;
+        if (atHome) h = '#home';
+        else {
+          const base = parkSlug(PARKS[parkIndex].park);
+          h = '#' + (activeId ? base + '/' + activeId : base);
+        }
         if (location.hash === h) return;
         const depth = (history.state && history.state.d) || 0;
         if (suppressHistory) history.replaceState({ d: depth }, '', h);
@@ -1389,18 +1500,17 @@
       // Show the view described by the current URL hash (used on Back/Forward).
       function applyHashState() {
         const hash = location.hash.slice(1);
-        if (hash) {
-          const parts = hash.split('/');
-          if (parts[1] && camById(parts[1])) {
-            const cam = camById(parts[1]);
-            if (cam.type === 'stream' && !canEmbedInline(cam)) showParkGrid(parkIndexOf(parts[1]));
-            else openDetail(parts[1]);
-            return;
-          }
-          const i = parkIndexBySlug(parts[0]);
-          if (i !== -1) { showParkGrid(i); return; }
+        if (!hash || hash === 'home') { openHome(); return; }
+        const parts = hash.split('/');
+        if (parts[1] && camById(parts[1])) {
+          const cam = camById(parts[1]);
+          if (cam.type === 'stream' && !canEmbedInline(cam)) showParkGrid(parkIndexOf(parts[1]));
+          else openDetail(parts[1]);
+          return;
         }
-        openGrid();
+        const i = parkIndexBySlug(parts[0]);
+        if (i !== -1) { showParkGrid(i); return; }
+        openHome();
       }
       window.addEventListener('popstate', () => {
         suppressHistory = true;
@@ -1418,6 +1528,15 @@
       function ytId(u) { const m = (u || '').match(/embed\/([\w-]+)/); return m ? m[1] : null; }
       function streamPoster(cam) { const id = ytId(cam.embed); return id ? 'https://img.youtube.com/vi/' + id + '/hqdefault.jpg' : null; }
       function streamWatch(cam) { const id = ytId(cam.embed); return id ? 'https://www.youtube.com/watch?v=' + id : cam.embed; }
+      // Human name of the host a non-embeddable stream opens on, for clear
+      // "opens in a new tab" labeling. YouTube (on file://) and HDOnTap streams
+      // can't embed inline, so we send users to the source.
+      function streamHost(cam) {
+        if (ytId(cam.embed)) return 'YouTube';
+        if (/hdontap\.com/i.test(cam.embed || '')) return 'HDOnTap';
+        return null;
+      }
+      function opensExternally(cam) { return cam.type === 'stream' && !canEmbedInline(cam); }
       // Embed URL for inline playback in the stage (autoplay muted where supported).
       function streamEmbedSrc(cam) {
         const u = cam.embed || '';
@@ -1425,8 +1544,13 @@
         if (ytId(cam.embed) && location.protocol !== 'file:') s += '&origin=' + encodeURIComponent(location.origin);
         return s;
       }
-      // YouTube live embeds only work from a real http(s) origin.
-      function canEmbedInline(cam) { return !ytId(cam.embed) || location.protocol !== 'file:'; }
+      // YouTube live embeds only work from a real http(s) origin. HDOnTap now
+      // enforces a CSP frame-ancestors rule (nps.gov / hdontap.com only), so its
+      // streams can't embed inline from our origin — open them externally.
+      function canEmbedInline(cam) {
+        if (/hdontap\.com/i.test(cam.embed || '')) return false;
+        return !ytId(cam.embed) || location.protocol !== 'file:';
+      }
 
       function intervalSeconds() {
         let s = parseInt(intervalInput.value, 10);
@@ -1635,14 +1759,17 @@
       function makeCard(cam, showPark) {
         const card = document.createElement('div');
         card.className = 'card';
+        const isStream = cam.type === 'stream';
+        const external = isStream && opensExternally(cam);
+        const host = external ? streamHost(cam) : null;
         const subtitle = showPark
           ? parkNameOf(cam.id) + ' · ' + areaOf(cam.id)
-          : (cam.type === 'stream' ? 'live stream' : '');
-        const isStream = cam.type === 'stream';
+          : (isStream ? (host ? 'opens on ' + host + ' ↗' : 'live stream') : '');
         const poster = isStream ? streamPoster(cam) : null;
         const media = isStream
           ? (poster ? '<img alt="' + cam.name + '" src="' + poster + '" />' : '<span class="noposter"></span>') +
-            '<span class="playbtn"></span>'
+            '<span class="playbtn"></span>' +
+            (host ? '<span class="ext-tag">Opens on ' + host + ' ↗</span>' : '')
           : '<img alt="' + cam.name + '" /><div class="imgError" hidden>Unavailable</div>';
         const badgeHtml = isStream
           ? '<span class="badge stream"><span class="dot"></span> <span class="badge-label">Stream</span></span>'
@@ -1696,9 +1823,67 @@
         grid.appendChild(d);
       }
 
+      // ---------- Home / landing ----------
+      // Ordered preview candidates for a park card. A camera flagged `hero: true`
+      // wins (curated good view); otherwise active image cams, then any image,
+      // then a stream poster. Each candidate is a { src, bust } we try in order,
+      // falling back on load failure (fixes cards backed by a dead feed).
+      function homePreviewSrcs(park) {
+        const cams = park.areas.flatMap(a => a.cameras);
+        const ordered = [
+          ...cams.filter(c => c.hero),
+          ...cams.filter(c => c.url && !c.off && !c.hero),
+          ...cams.filter(c => c.url && c.off && !c.hero),
+        ];
+        const srcs = ordered.map(c => ({ src: c.url, bust: true }));
+        // Stream posters as a last resort (static thumbnails, no bust needed).
+        cams.filter(c => c.type === 'stream').forEach(c => {
+          const p = streamPoster(c); if (p) srcs.push({ src: p, bust: false });
+        });
+        return srcs;
+      }
+      // Try each candidate source until one loads; leaves the dark placeholder
+      // if all fail. Cross-origin black-but-valid frames can't be detected
+      // (canvas reads are CORS-blocked), so only true load failures fall back.
+      function loadParkPreview(imgEl, srcs, idx) {
+        idx = idx || 0;
+        if (idx >= srcs.length) { imgEl.style.display = 'none'; return; }
+        const cand = srcs[idx];
+        const url = cand.bust ? bust(cand.src) : cand.src;
+        imgEl.onerror = () => loadParkPreview(imgEl, srcs, idx + 1);
+        imgEl.onload = () => { if (imgEl.naturalWidth < 2) loadParkPreview(imgEl, srcs, idx + 1); };
+        imgEl.src = url;
+      }
+      function makeParkCard(park, i) {
+        const el = document.createElement('div');
+        el.className = 'park-card';
+        const count = park.areas.reduce((n, a) => n + a.cameras.length, 0);
+        const srcs = homePreviewSrcs(park);
+        el.innerHTML =
+          (srcs.length ? '<img alt="" />' : '<span class="pc-noimg"></span>') +
+          '<div class="pc-overlay"></div>' +
+          '<div class="pc-info">' +
+            '<div class="pc-name">' + park.park + '</div>' +
+            '<div class="pc-count">' + count + ' camera' + (count === 1 ? '' : 's') + '</div>' +
+          '</div>';
+        if (srcs.length) loadParkPreview(el.querySelector('img'), srcs);
+        el.addEventListener('click', () => showParkGrid(i));
+        return el;
+      }
+      function buildHome() {
+        statParks.textContent = PARKS.length;
+        statCams.textContent = ALL_CAMERAS.length;
+        homeFavorites.innerHTML = '';
+        const favs = favCameras();
+        if (favs.length) homeFavorites.appendChild(gridSection('★ Favorites', favs, true));
+        parkGrid.innerHTML = '';
+        PARKS.map((p, i) => ({ p, i }))
+          .sort((a, b) => a.p.park.localeCompare(b.p.park))
+          .forEach(({ p, i }) => parkGrid.appendChild(makeParkCard(p, i)));
+      }
+
       function buildGrid() {
         grid.innerHTML = '';
-
         // Search mode: match cameras across every park, grouped by park.
         if (searchText) {
           let total = 0;
@@ -1787,6 +1972,7 @@
           brandSub.textContent = PARKS[parkIndex].park;
         }
         clearImgRefs();
+        brandSub.textContent = PARKS[parkIndex].park;
         stageTitle.textContent = cam.name;
         stageArea.textContent = parkNameOf(id) + ' · ' + areaOf(id);
         updateFavBtn();
@@ -1816,7 +2002,7 @@
           frame.src = streamEmbedSrc(cam);
           setBadge(stageBadge, 'stream', 'Stream');
           stageWatch.href = streamWatch(cam);
-          stageWatch.textContent = ytId(cam.embed) ? 'Watch on YouTube ↗' : 'Open live ↗';
+          stageWatch.textContent = streamHost(cam) ? 'Watch on ' + streamHost(cam) + ' ↗' : 'Open live ↗';
         } else {
           replaceStageStream();
           stageImage.hidden = false;
@@ -1824,8 +2010,9 @@
           updateUpdatedLabel(id);
         }
         buildSidebar();
-        gridView.hidden = true;
-        detailView.hidden = false;
+        setView('detail');
+        atHome = false;
+        backBtn.textContent = '← All cameras';
         backBtn.style.display = 'inline-flex';
         refreshAll();
         resetTimer();
@@ -1847,14 +2034,37 @@
         }
       }
 
-      function openGrid() {
-        activeId = null;
+      // Toggle which top-level view is visible; drives topbar mode via data-view.
+      function setView(name) {
+        homeView.hidden = name !== 'home';
+        gridView.hidden = name !== 'grid';
+        detailView.hidden = name !== 'detail';
+        document.body.dataset.view = name;
+      }
+
+      function openHome() {
+        activeId = null; atHome = true;
         clearImgRefs();
         if (stageStream && stageStream.src) replaceStageStream();
-        buildGrid();
-        detailView.hidden = true;
-        gridView.hidden = false;
+        brandSub.textContent = 'Live views';
+        brandSub.removeAttribute('href'); brandSub.removeAttribute('title');
+        buildHome();
+        setView('home');
         backBtn.style.display = 'none';
+        refreshAll();
+        resetTimer();
+        updateHash();
+      }
+
+      function openGrid() {
+        activeId = null; atHome = false;
+        clearImgRefs();
+        if (stageStream && stageStream.src) replaceStageStream();
+        brandSub.textContent = PARKS[parkIndex].park;
+        buildGrid();
+        setView('grid');
+        backBtn.textContent = '← All parks';
+        backBtn.style.display = 'inline-flex';
         refreshAll();
         resetTimer();
         updateHash();
@@ -1862,9 +2072,13 @@
         saveSession();
       }
 
-      // "← All cameras" always returns to the current park's grid, regardless
-      // of how many cameras were visited via the sidebar (don't step back one).
-      backBtn.addEventListener('click', () => { openGrid(); });
+      // Back button is contextual: from a camera → the park grid; from a park
+      // grid → the home/landing view.
+      backBtn.addEventListener('click', () => {
+        if (document.body.dataset.view === 'detail') openGrid();
+        else openHome();
+      });
+      homeLink.addEventListener('click', openHome);
       stageRefresh.addEventListener('click', () => { refreshAll(); resetTimer(); });
       stageFav.addEventListener('click', () => {
         toggleFav(activeId);
@@ -2023,6 +2237,14 @@
           const v = searchInput.value.trim().toLowerCase();
           if (v === searchText) return;
           searchText = v;
+          // Typing on the home view drops into the (global) grid results.
+          if (atHome) {
+            if (!v) return;            // empty search on home: stay home
+            atHome = false;
+            setView('grid');
+            backBtn.textContent = '← All parks';
+            backBtn.style.display = 'inline-flex';
+          }
           applyGridChange();
         }, 180);
       });
@@ -2051,6 +2273,7 @@
         if (typing) { if (e.key === 'Escape') t.blur(); return; }
         if (e.key === 'Escape') {
           if (activeId !== null) { e.preventDefault(); openGrid(); }
+          else if (document.body.dataset.view === 'grid') { e.preventDefault(); openHome(); }
         } else if (activeId !== null && (e.key === 'ArrowRight' || e.key === 'ArrowDown')) {
           e.preventDefault(); stepDetail(1);
         } else if (activeId !== null && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) {
@@ -2063,18 +2286,15 @@
         suppressHistory = true;
         const hash = location.hash.slice(1);
         let camId = null, pIdx = null, interval = null;
-        if (hash) {
+        if (hash && hash !== 'home') {
           const parts = hash.split('/');
           if (parts[1] && camById(parts[1])) camId = parts[1];
           else { const i = parkIndexBySlug(parts[0]); if (i !== -1) pIdx = i; }
         }
-        if (camId === null && pIdx === null) {
-          try {
-            const s = JSON.parse(localStorage.getItem(STATE_KEY) || '{}');
-            if (s.park) { const i = parkIndexBySlug(s.park); if (i !== -1) pIdx = i; }
-            if (s.interval) interval = s.interval;
-          } catch (e) {}
-        }
+        try {
+          const s = JSON.parse(localStorage.getItem(STATE_KEY) || '{}');
+          if (s.interval) interval = s.interval;
+        } catch (e) {}
         if (interval) intervalInput.value = interval;
         if (pIdx !== null) { parkIndex = pIdx; AREAS = PARKS[parkIndex].areas; }
         populateParks();
@@ -2082,17 +2302,16 @@
           const cam = camById(camId);
           if (cam && cam.type === 'stream' && !canEmbedInline(cam)) {
             const i = parkIndexOf(camId);
-            if (i !== -1) { parkIndex = i; AREAS = PARKS[i].areas; parkSelect.value = String(i); brandSub.textContent = PARKS[i].park; }
-            buildGrid(); refreshAll();
+            if (i !== -1) { parkIndex = i; AREAS = PARKS[i].areas; parkSelect.value = String(i); }
+            openGrid();
           } else {
             openDetail(camId);
           }
+        } else if (pIdx !== null) {
+          openGrid();
         } else {
-          buildGrid();
-          refreshAll();
+          openHome();
         }
-        updateHash();
-        updateBrandLink();
         suppressHistory = false;
         resetTimer();
       })();

@@ -23,7 +23,7 @@ All application code is inside the single IIFE `<script>` at the bottom of
 ### Data model
 - `PARKS` — the source of truth. An array of `{ park, areas[] }`.
   - Each area is `{ area, cameras[] }`.
-  - Each camera is `{ id, name, url?, off?, type?, embed?, live? }`:
+  - Each camera is `{ id, name, url?, off?, type?, embed?, live?, hero? }`:
     - `id` — stable unique slug (also the favorite key / cross-park lookup key).
     - `name` — display label.
     - `url` — base image URL, no query string (image cameras).
@@ -34,6 +34,8 @@ All application code is inside the single IIFE `<script>` at the bottom of
       whose stream can't be embedded (token-gated Pixelcaster: Old Faithful,
       Yosemite Falls / Half Dome / El Capitan). Adds a **Watch live ↗** button
       on the detail page and upgrades its badge from **Online** to **Live**.
+    - `hero: true` — optional; makes this camera the preferred preview image for
+      its park card on the home view (else the first active image is used).
 - `ALL_CAMERAS` / `camById(id)` — flat global lookups across every park.
 - `currentCameras()` — cameras for the currently selected park only.
 - `PARK_CODES` — park name → NPS park code; drives the header title link to
@@ -50,14 +52,25 @@ All application code is inside the single IIFE `<script>` at the bottom of
   keeps each option's value as its original `PARKS` index.
 
 ### Views
-- **Grid view** — landing page. Cameras grouped by area as cards. A global
+Three top-level views (`homeView` / `gridView` / `detailView`), toggled by
+`setView(name)` which also sets `body[data-view]` (drives which top-bar controls
+show). Navigation tiers: **home → park grid → camera detail**.
+- **Home view** — the landing page (`openHome` / `buildHome`). A hero banner with
+  live stats, a global **★ Favorites** section, and an "All parks" grid of park
+  cards (`makeParkCard`): each shows a live preview thumbnail, name, and camera
+  count, and opens that park's grid. Preview picking + failure fallback is in
+  `homePreviewSrcs` / `loadParkPreview` (see "Home previews").
+- **Grid view** — one park's cameras grouped by area as cards. A global
   **★ Favorites** section renders first when any favorites exist. A search box
   and filter chips (**Hide offline**, **Streams**) live in the top bar.
 - **Detail view** — one large "stage" (image, or an embedded stream player)
   plus a sidebar of other cameras (grouped by area, favorites first). Image
   cameras show Refresh + Save image; streams show a **Watch ↗** link instead.
+- The **"National Park Webcams" eyebrow** (`homeLink`) returns to home from
+  anywhere; the back button is contextual (detail → park grid, grid → home).
 - Navigating pushes browser history; the URL hash is shareable/deep-linkable
-  and Back/Forward work (see "State, URLs & history").
+  (`#home`, `#park`, `#park/cam`) and Back/Forward work (see "State, URLs &
+  history").
 
 ### Key behaviors
 - **Refresh** — a 1-second ticker counts down; on reaching zero every visible
@@ -127,11 +140,17 @@ All application code is inside the single IIFE `<script>` at the bottom of
 - Grid tiles show a lightweight poster (YouTube thumbnail, or a placeholder)
   with a play button; clicking opens the **detail view** with the player
   embedded inline (`#stageStream` iframe). Helpers: `ytId`, `streamPoster`,
-  `streamWatch`, `streamEmbedSrc`, `canEmbedInline`.
+  `streamWatch`, `streamEmbedSrc`, `canEmbedInline`, `streamHost`,
+  `opensExternally`.
+- **Non-embeddable streams open in a new tab** rather than inline. `makeCard`
+  shows an **Opens on <host> ↗** pill (and subtitle) on such tiles, and the
+  detail button reads **Watch on <host> ↗** (`streamHost` names the host).
 - **YouTube live embeds fail from `file://`** with "Error 153" (null origin), so
   `canEmbedInline()` is false for YouTube on `file:` — those open on youtube.com
   instead. Served over **http(s)** they embed inline (with an `&origin=` param).
-  angelcam / HDOnTap embeds have no such restriction.
+- **HDOnTap** now sends a CSP `frame-ancestors` allowlist (nps.gov / hdontap.com
+  only), so its streams can't embed from our origin at all — `canEmbedInline()`
+  returns false for any `hdontap.com` embed and they open externally.
 - **angelcam** feeds need a per-visit token (`X-Frame-Options: deny` without it);
   a static embed URL can't carry it, so they were removed.
 - **Pixelcaster HLS** streams (e.g. Old Faithful) can't embed without an HLS
@@ -139,18 +158,29 @@ All application code is inside the single IIFE `<script>` at the bottom of
   (`.../snapshots/<name>/latest_1920x.jpg`, found in
   `pixelcaster.com/live/customer/<cam>.json`) as a normal image camera.
 
+## Home previews
+- Each park card's thumbnail comes from `homePreviewSrcs(park)` — an ordered
+  candidate list (`hero` cams → active image cams → inactive image cams →
+  stream posters). `loadParkPreview` tries them in order, advancing on load
+  failure (`onerror` or `naturalWidth < 2`) and leaving the dark placeholder if
+  all fail. This hides cards backed by a dead lead feed.
+- **Limitation:** a feed that returns a *valid but black* JPEG (night frame, or
+  a powered-off cam still serving an image) can't be auto-detected — canvas
+  pixel reads are CORS-blocked for cross-origin images. Use `hero: true` to pin
+  a known-good camera for such parks.
+
 ## State, URLs & history
 - `localStorage`: `nps-webcam-state` = `{ park: <slug>, interval }`;
   `nps-webcam-favorites` = array of IDs.
-- URL hash: `#<parkSlug>` (grid) or `#<parkSlug>/<camId>` (detail) — shareable
-  and deep-linkable. `initState()` parses it on load (a valid `camId` wins),
-  else falls back to `localStorage`, else park index 0.
+- URL hash: `#home` (landing), `#<parkSlug>` (grid), or `#<parkSlug>/<camId>`
+  (detail) — shareable and deep-linkable. `initState()` parses it on load (a
+  valid `camId` wins, then a park slug); with no/`#home` hash it opens the home
+  view. Only the refresh interval persists in `localStorage`.
 - Navigation uses `history.pushState`; a `popstate` handler (`applyHashState`)
   re-applies the view so browser **Back/Forward** work. Re-applies are
-  suppressed from creating new entries (`suppressHistory`). The in-app
-  "← All cameras" button always calls `openGrid()` (returns to the current
-  park's grid regardless of how many cameras were opened via the sidebar);
-  browser Back/Forward still step through history entry-by-entry independently.
+  suppressed from creating new entries (`suppressHistory`). The back button is
+  contextual: from a camera → the park grid, from a grid → home. Browser
+  Back/Forward still step through history entry-by-entry independently.
 
 ## Camera catalog & the NPS Solr API
 The authoritative list of every NPS webcam is the Solr endpoint behind
