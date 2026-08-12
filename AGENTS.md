@@ -36,6 +36,15 @@ All application code is inside the single IIFE `<script>` at the bottom of
       on the detail page and upgrades its badge from **Online** to **Live**.
 - `ALL_CAMERAS` / `camById(id)` — flat global lookups across every park.
 - `currentCameras()` — cameras for the currently selected park only.
+- `PARK_CODES` — park name → NPS park code; drives the header title link to
+  `nps.gov/<code>/index.htm` (`updateBrandLink`).
+- `CAM_PAGES` — camera `id` → its official NPS page (mostly
+  `media/webcam/view.htm?id=…`, air-quality cams → `subjects/air/webcams.htm`).
+  Built by matching each camera's `url` against the Solr catalog's `Webcam_URL`
+  (see "Camera catalog"); drives the detail view's camera-name link (the
+  `stageTitle` anchor) so users can open a camera's official page to check its
+  status. ~130 of ~140 image cams are covered; unmatched ones show a plain
+  (unlinked) name.
 - `parkIndex` / `AREAS` — current park selection state.
 - Parks may be appended in any order: the dropdown sorts alphabetically but
   keeps each option's value as its original `PARKS` index.
@@ -52,7 +61,10 @@ All application code is inside the single IIFE `<script>` at the bottom of
 
 ### Key behaviors
 - **Refresh** — a 1-second ticker counts down; on reaching zero every visible
-  camera is refreshed. Interval is chosen from a dropdown (1s min → 60s).
+  camera is refreshed. Interval is chosen from a dropdown (1s min → 60s). While
+  the tab is hidden (`document.hidden`) `tick()` skips refreshing to save
+  bandwidth/battery; a `visibilitychange` handler does one immediate refresh and
+  restarts the countdown on return.
 - **Cache busting** — `bust(url)` appends `?<timestamp>` to force fresh fetches.
 - **Preload-then-swap** — `refreshCamera(id)` loads the new frame into an
   off-screen `Image` first and only swaps it into visible `<img>` elements on

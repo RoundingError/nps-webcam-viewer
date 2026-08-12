@@ -332,6 +332,9 @@
       background: var(--panel-2);
     }
     .stage-bar .title { font-size: 15px; font-weight: 650; }
+    .stage-bar .title a { color: inherit; text-decoration: none; }
+    .stage-bar .title a[href]:hover { color: var(--accent-hover); text-decoration: underline; }
+    .stage-bar .title a[href]::after { content: " \2197"; font-size: .8em; color: var(--muted); font-weight: 600; }
     .stage-bar .area-tag {
       font-size: 11px;
       color: var(--muted);
@@ -467,7 +470,7 @@
             <iframe id="stageStream" hidden allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
           </div>
           <div class="stage-bar">
-            <span class="title" id="stageTitle"></span>
+            <span class="title"><a id="stageTitle" target="_blank" rel="noopener"></a></span>
             <span class="area-tag" id="stageArea"></span>
             <button class="iconBtn favBtn" id="stageFav">☆ Favorite</button>
             <div class="spacer"></div>
@@ -1130,6 +1133,142 @@
         'Carlsbad Caverns': 'cave', 'Channel Islands': 'chis',
       };
 
+      // Per-camera NPS page (from the Solr catalog): lets users open the
+      // official page for a camera to check status/details when a frame looks
+      // wrong. Adds an "NPS page ↗" link on the detail view where known.
+      const CAM_PAGES = {
+        'sunrise-mtn': 'https://www.nps.gov/media/webcam/view.htm?id=81B4638D-1DD8-B71B-0B1092DD4F75978D',
+        'sunrise-lot': 'https://www.nps.gov/media/webcam/view.htm?id=81B4642A-1DD8-B71B-0B91DBD2C476DCBD',
+        'paradise-mtn': 'https://www.nps.gov/media/webcam/view.htm?id=81B46307-1DD8-B71B-0B72918A4B2EB790',
+        'paradise-east': 'https://www.nps.gov/media/webcam/view.htm?id=81B463D4-1DD8-B71B-0BB1FE8364315734',
+        'paradise-west': 'https://www.nps.gov/media/webcam/view.htm?id=81B463E4-1DD8-B71B-0B3E1F3743E9614D',
+        'paradise-gh': 'https://www.nps.gov/media/webcam/view.htm?id=81B463F4-1DD8-B71B-0B9A136C52BCC56D',
+        'paradise-tatoosh': 'https://www.nps.gov/media/webcam/view.htm?id=81B46402-1DD8-B71B-0B95C911C1395AAC',
+        'mora-longmire': 'https://www.nps.gov/media/webcam/view.htm?id=81B46445-1DD8-B71B-0BB0376A8482E275',
+        'yell-north-arch': 'https://www.nps.gov/media/webcam/view.htm?id=81B468BC-1DD8-B71B-0BBA4C383E179188',
+        'yell-north-electric': 'https://www.nps.gov/media/webcam/view.htm?id=81B468AB-1DD8-B71B-0BE84D8E8E0F1112',
+        'yell-mammoth-parade': 'https://www.nps.gov/media/webcam/view.htm?id=696F20E1-F421-B232-FE72D6D85B157422',
+        'yell-washburn-ne': 'https://www.nps.gov/media/webcam/view.htm?id=81B46891-1DD8-B71B-0B6575944D4DECD5',
+        'yell-washburn-s': 'https://www.nps.gov/media/webcam/view.htm?id=81B4689E-1DD8-B71B-0B8741319EA29FD3',
+        'yell-west-gate': 'https://www.nps.gov/media/webcam/view.htm?id=81B468C8-1DD8-B71B-0BFE5983E4D2E421',
+        'yell-west-into': 'https://www.nps.gov/media/webcam/view.htm?id=81B468D6-1DD8-B71B-0B9C2E324EF5F9F8',
+        'yell-east-out': 'https://www.nps.gov/media/webcam/view.htm?id=45FDA0AC-0A10-4ACA-A0C6-44F440575AE1',
+        'yell-east-in': 'https://www.nps.gov/media/webcam/view.htm?id=E3772256-9585-4859-A1FD-FC47F15F7226',
+        'glac-apgar-mtn': 'https://www.nps.gov/media/webcam/view.htm?id=81B4691B-1DD8-B71B-0BB9DBEE21A59335',
+        'glac-apgar-village': 'https://www.nps.gov/media/webcam/view.htm?id=81B4692D-1DD8-B71B-0B9AE4B7C186B022',
+        'glac-apgar-vc': 'https://www.nps.gov/media/webcam/view.htm?id=7290EA71-A74E-A7B4-74805070A3996FAC',
+        'glac-apgar-2': 'https://www.nps.gov/media/webcam/view.htm?id=64C657CB-DE31-7B14-4E3946885805BD67',
+        'glac-mcdonald-1': 'https://www.nps.gov/media/webcam/view.htm?id=81B4690A-1DD8-B71B-0B2D069E1CB02E6A',
+        'glac-mcdonald-2': 'https://www.nps.gov/media/webcam/view.htm?id=D428B88A-BC1A-A5BF-88E3D63CF89D3452',
+        'glac-west-entrance': 'https://www.nps.gov/media/webcam/view.htm?id=33478DF3-1DD8-B71B-0B8C97DB0A03B0F7',
+        'glac-hq': 'https://www.nps.gov/media/webcam/view.htm?id=81B46943-1DD8-B71B-0B46D68861599592',
+        'glac-middlefork': 'https://www.nps.gov/media/webcam/view.htm?id=81B46955-1DD8-B71B-0B698C4D88410C05',
+        'glac-loganpass-lot': 'https://www.nps.gov/media/webcam/view.htm?id=325AE6AF-BAEB-F65D-EF3D638BF683E78E',
+        'glac-hidden-lake': 'https://www.nps.gov/media/webcam/view.htm?id=6E559311-9E10-3A12-2442A20797C7B6C6',
+        'glac-stmary-valley': 'https://www.nps.gov/media/webcam/view.htm?id=7A5DA146-CE8D-E071-2C00362A062A3D0E',
+        'glac-many-glacier': 'https://www.nps.gov/media/webcam/view.htm?id=2ABFE780-E817-D105-9B14697AEB43EBA6',
+        'glac-many-glacier-2': 'https://www.nps.gov/media/webcam/view.htm?id=2B15B960-C427-0389-BDC2FA209372B7F6',
+        'glac-stmary': 'https://www.nps.gov/media/webcam/view.htm?id=AE7C9B53-910E-6D3A-D6133266826C6977',
+        'glac-stmary-osprey': 'https://www.nps.gov/media/webcam/view.htm?id=81B468FB-1DD8-B71B-0BB2B9C6DC2C0B02',
+        'glac-dusty-star': 'https://www.nps.gov/media/webcam/view.htm?id=FEBE3539-D0B5-B95A-B341B5A5C777FB9E',
+        'glac-night-sky': 'https://www.nps.gov/media/webcam/view.htm?id=D4BDFE7E-AC7F-D681-8A03C820E06CBA0A',
+        'glac-two-medicine': 'https://www.nps.gov/media/webcam/view.htm?id=1F7197E2-FF96-18D7-0AC05A501EBA2571',
+        'glac-squirrel': 'https://www.nps.gov/media/webcam/view.htm?id=81B469A8-1DD8-B71B-0BD1B431665C86DC',
+        'glac-goats': 'https://www.nps.gov/media/webcam/view.htm?id=5EBFD1C4-E286-D2C9-4A147E5C52F3442F',
+        'olym-hr-south': 'https://www.nps.gov/media/webcam/view.htm?id=81B46251-1DD8-B71B-0B29B9750DE273B5',
+        'olym-hr-lot': 'https://www.nps.gov/media/webcam/view.htm?id=81B46260-1DD8-B71B-0B7A7B41BF33172A',
+        'dena-alpine': 'https://www.nps.gov/media/webcam/view.htm?id=81B466AE-1DD8-B71B-0BC74704AD5A77BC',
+        'dena-depot': 'https://www.nps.gov/media/webcam/view.htm?id=81B466C8-1DD8-B71B-0B09BF265A80000E',
+        'dena-puppies': 'https://www.nps.gov/media/webcam/view.htm?id=81B46C2C-1DD8-B71B-0BFD462F60FB1EA8',
+        'romo-beaver': 'https://www.nps.gov/media/webcam/view.htm?id=81B4686B-1DD8-B71B-0B122CB864D072FC',
+        'romo-fallriver': 'https://www.nps.gov/media/webcam/view.htm?id=81B46856-1DD8-B71B-0B8636427EFFC938',
+        'romo-grandlake': 'https://www.nps.gov/media/webcam/view.htm?id=3F33B673-957B-51DD-612B99E4A9FDF417',
+        'romo-alpine': 'https://www.nps.gov/media/webcam/view.htm?id=81B4681E-1DD8-B71B-0B8311E4FAC15EF4',
+        'romo-divide': 'https://www.nps.gov/media/webcam/view.htm?id=D589367E-0DA6-55AF-291E6C39432F919E',
+        'romo-longs': 'https://www.nps.gov/media/webcam/view.htm?id=81B46847-1DD8-B71B-0B46D032F33B54DF',
+        'romo-kawuneeche': 'https://www.nps.gov/media/webcam/view.htm?id=81B4682A-1DD8-B71B-0BBC127D2E00ACD9',
+        'crla-lake': 'https://www.nps.gov/media/webcam/view.htm?id=BAB9400D-C123-A696-F87EB5B6A61F30D6',
+        'crla-annie': 'https://www.nps.gov/media/webcam/view.htm?id=81B4628D-1DD8-B71B-0B183DA83E05154F',
+        'crla-steel': 'https://www.nps.gov/media/webcam/view.htm?id=81B462AA-1DD8-B71B-0BAC82E1AFD3CC1D',
+        'grca-south-entrance': 'https://www.nps.gov/media/webcam/view.htm?id=9B5FC6BA-9FE6-EC6B-61637825D562D367',
+        'grca-kolb': 'https://www.nps.gov/media/webcam/view.htm?id=CC0CA1C7-E607-6F46-707E19938BBFEE63',
+        'grca-brightangel': 'https://www.nps.gov/media/webcam/view.htm?id=69E0162D-0ED1-F68A-6B52A11F95FD867B',
+        'grca-yavapai': 'https://www.nps.gov/subjects/air/webcams.htm?site=grca',
+        'grca-sf-peaks': 'https://www.nps.gov/media/webcam/view.htm?id=348818A5-C6EE-66E7-41F5F43A4C334357',
+        'grsm-newfound': 'https://www.nps.gov/subjects/air/webcams.htm?site=grsm',
+        'grsm-purchase': 'https://www.nps.gov/subjects/air/webcams.htm?site=rlca',
+        'grsm-newfound-live': 'https://www.nps.gov/media/webcam/view.htm?id=C589EEEF-1DD8-B71B-0B0463C308FF64DD',
+        'havo-v2': 'https://www.nps.gov/media/webcam/view.htm?id=6AA1C994-BB25-26A1-A524367EA9E7D676',
+        'havo-s2': 'https://www.nps.gov/media/webcam/view.htm?id=71F381C4-E87A-BCEC-51AC1FBE0BEDDBE9',
+        'havo-v1': 'https://www.nps.gov/media/webcam/view.htm?id=182ADDB9-0627-4EBA-94C1658E5EF29871',
+        'havo-k2': 'https://www.nps.gov/media/webcam/view.htm?id=C8F61201-BB93-4F34-ECBD63CB56715481',
+        'havo-kp': 'https://www.nps.gov/media/webcam/view.htm?id=CA194288-F226-EE43-8DE98FD5F20FC4FF',
+        'havo-mitd': 'https://www.nps.gov/media/webcam/view.htm?id=CBF20C5F-EEA2-F4E0-1EBF6ADE74D2DABA',
+        'havo-mu': 'https://www.nps.gov/media/webcam/view.htm?id=CAF65190-DBCA-1A22-29A80739FEFBC817',
+        'havo-pw': 'https://www.nps.gov/media/webcam/view.htm?id=CB297CB0-CB5C-99F3-868877061AFB0B62',
+        'havo-pe': 'https://www.nps.gov/media/webcam/view.htm?id=EDA334EA-BFA0-656C-A9D41EB152C2D683',
+        'havo-r3': 'https://www.nps.gov/media/webcam/view.htm?id=430C8380-8BB1-4917-B443-80875DDB9CE1',
+        'havo-s1': 'https://www.nps.gov/media/webcam/view.htm?id=C8A35ACF-C302-AF3A-5B4086EEB669F711',
+        'havo-ml': 'https://www.nps.gov/media/webcam/view.htm?id=E1BA8F29-0BAF-52FE-229F39263A990800',
+        'havo-mt': 'https://www.nps.gov/media/webcam/view.htm?id=3BFA7662-E5A8-E395-ABD45F3FF29D945E',
+        'havo-mk': 'https://www.nps.gov/media/webcam/view.htm?id=CADD9583-AF7C-1DC8-FFC97C9F699D7A14',
+        'havo-m3': 'https://www.nps.gov/media/webcam/view.htm?id=3C0FF559-A0C6-5407-2A0C33CD91A1D88B',
+        'havo-mdl': 'https://www.nps.gov/media/webcam/view.htm?id=EE196017-AB32-9FD8-74239F3918E28F2C',
+        'havo-m2': 'https://www.nps.gov/media/webcam/view.htm?id=EE01A0C2-D2E7-409E-2D8DE27D2F308C35',
+        'havo-hl': 'https://www.nps.gov/media/webcam/view.htm?id=EE2AB5B3-D7D0-8A1E-8C719BFF988F87B1',
+        'yose-halfdome': 'https://www.nps.gov/media/webcam/view.htm?id=510DED3A-F9E0-3BCC-3A896F980BE05DFE',
+        'yose-sentinel': 'https://www.nps.gov/media/webcam/view.htm?id=50E781A7-99A4-27F7-3773DF1DBB57C0FC',
+        'yose-turtleback': 'https://www.nps.gov/media/webcam/view.htm?id=521123D5-0EA2-C472-403A8D58B11A614F',
+        'yose-badger': 'https://www.nps.gov/media/webcam/view.htm?id=81B46503-1DD8-B71B-0BABF33689031F0B',
+        'yose-tuolumne': 'https://www.nps.gov/media/webcam/view.htm?id=81B46511-1DD8-B71B-0BF4530A57767712',
+        'yose-happyisles': 'https://www.nps.gov/media/webcam/view.htm?id=81B46521-1DD8-B71B-0BB6424139EC91BE',
+        'acad-jordan': 'https://www.nps.gov/media/webcam/view.htm?id=A483238F-BAE9-C9E2-BE362FE8240C5E7F',
+        'acad-eye': 'https://www.nps.gov/media/webcam/view.htm?id=35DB6BF0-E1A6-351A-4D2A4CBF185650AF',
+        'acad-mcfarland': 'https://www.nps.gov/subjects/air/webcams.htm?site=acad',
+        'zion-temples': 'https://www.nps.gov/media/webcam/view.htm?id=A4068FB2-DB05-82B5-F242852BBAA0A971',
+        'zion-southgate': 'https://www.nps.gov/media/webcam/view.htm?id=81B46CC4-1DD8-B71B-0B1B52AAF5930623',
+        'arch-entrance': 'https://www.nps.gov/media/webcam/view.htm?id=81B46BDB-1DD8-B71B-0B250E8F4CC1E74A',
+        'arch-udot': 'https://www.nps.gov/media/webcam/view.htm?id=81B46BCF-1DD8-B71B-0B91099975A047A5',
+        'bibe-panther-junction': 'https://www.nps.gov/subjects/air/webcams.htm?site=bibe',
+        'blca-grizzly-ridge': 'https://www.nps.gov/media/webcam/view.htm?id=10418AE0-DA0E-967C-30E3C611BCFA949F',
+        'blca-gunnison-point': 'https://www.nps.gov/media/webcam/view.htm?id=0FA6F288-B063-7618-DF540382B0C0A179',
+        'brca-air-quality': 'https://www.nps.gov/subjects/air/webcams.htm?site=brca',
+        'deva-devils-hole-pupfish': 'https://www.nps.gov/media/webcam/view.htm?id=81B46C1E-1DD8-B71B-0BFC9EB46EBC79DE',
+        'glba-tlingit-trail': 'https://www.nps.gov/media/webcam/view.htm?id=81B46720-1DD8-B71B-0B4AA07A2DC9D393',
+        'glba-bartlett-lagoon': 'https://www.nps.gov/media/webcam/view.htm?id=81B46702-1DD8-B71B-0BF47E9DB5A237C2',
+        'glba-bartlett-dock': 'https://www.nps.gov/media/webcam/view.htm?id=81B46712-1DD8-B71B-0B4B99EDA0AE3CFC',
+        'glba-lower-bay': 'https://www.nps.gov/media/webcam/view.htm?id=81B4672D-1DD8-B71B-0B04336F55ECDD47',
+        'grsa-visitor-center': 'https://www.nps.gov/media/webcam/view.htm?id=81B46A26-1DD8-B71B-0B14B49F55CDE266',
+        'gumo-dog-canyon': 'https://www.nps.gov/media/webcam/view.htm?id=3598C342-D08B-A76D-2A442D3D2864EFD6',
+        'gumo-el-capitan': 'https://www.nps.gov/media/webcam/view.htm?id=9849DE2B-BC23-1110-33CED7C04E8AAF05',
+        'gumo-mckittrick-canyon': 'https://www.nps.gov/media/webcam/view.htm?id=422DD5D2-9580-4AA5-8140-B98006F693D3',
+        'gumo-mckittrick-lot': 'https://www.nps.gov/media/webcam/view.htm?id=487362D9-489D-4F46-9632-783DD76C4A87',
+        'gumo-pine-springs': 'https://www.nps.gov/media/webcam/view.htm?id=E73E3175-DF46-3AF2-28593FC1F83AE264',
+        'hale-crater': 'https://www.nps.gov/media/webcam/view.htm?id=56F5E0DC-9116-8502-7F673D0FF0B8378A',
+        'isro-greenstone-ne': 'https://www.nps.gov/media/webcam/view.htm?id=A4B08269-BE8A-67B6-5AA047AB05CE4814',
+        'isro-greenstone-sw': 'https://www.nps.gov/media/webcam/view.htm?id=0EE1CA55-EE60-AA3D-094562D38610B700',
+        'isro-middle-islands': 'https://www.nps.gov/media/webcam/view.htm?id=A3F24CFE-E4F1-7EB2-F802285F953253C2',
+        'isro-mott-dock': 'https://www.nps.gov/media/webcam/view.htm?id=FB2B5F92-E9F6-6BE9-6DD9CEE73DB0E31C',
+        'isro-mott-sw': 'https://www.nps.gov/media/webcam/view.htm?id=AB97D925-E45D-295C-F7C13BBDC35AF9E5',
+        'isro-north-shore': 'https://www.nps.gov/media/webcam/view.htm?id=A3720AFA-E940-6127-6902E95ED431184B',
+        'isro-rock-harbor': 'https://www.nps.gov/media/webcam/view.htm?id=81B46B18-1DD8-B71B-0B6741D09D58BA2A',
+        'isro-smithwick': 'https://www.nps.gov/media/webcam/view.htm?id=EEC7A140-A320-5EC7-9344207E9416A87C',
+        'isro-tobin-harbor': 'https://www.nps.gov/media/webcam/view.htm?id=41516A2F-B710-0362-EFEECACAA00F1EF0',
+        'isro-windigo': 'https://www.nps.gov/media/webcam/view.htm?id=C97C8431-A655-D5A3-13742820024E5899',
+        'jotr-belle-mountain': 'https://www.nps.gov/subjects/air/webcams.htm?site=jotr',
+        'lavo-kyvc': 'https://www.nps.gov/media/webcam/view.htm?id=9DFC6A5A-04A9-4982-806C-26C2B9FEC6D4',
+        'lavo-manzanita': 'https://www.nps.gov/media/webcam/view.htm?id=81B4627F-1DD8-B71B-0BEBCC5B1768D617',
+        'maca-green-river': 'https://www.nps.gov/subjects/air/webcams.htm?site=maca',
+        'meve-spruce-tree': 'https://www.nps.gov/media/webcam/view.htm?id=81B46A88-1DD8-B71B-0B167518C73343F3',
+        'neri-canyon-rim': 'https://www.nps.gov/media/webcam/view.htm?id=03D5B344-9A69-16BC-F00004463B3C22F8',
+        'seki-giant-forest': 'https://www.nps.gov/subjects/air/webcams.htm?site=seki',
+        'shen-big-meadows': 'https://www.nps.gov/media/webcam/view.htm?id=81B46B99-1DD8-B71B-0B124A40CC3384CE',
+        'shen-mountain-view': 'https://www.nps.gov/media/webcam/view.htm?id=81B46B71-1DD8-B71B-0B55074571E08B1E',
+        'wrst-kennecott-mill': 'https://www.nps.gov/media/webcam/view.htm?id=51F606E1-BAF1-472B-2BC7D21ED4CDA08E',
+        'wrst-kennicott-glacier': 'https://www.nps.gov/media/webcam/view.htm?id=5224B014-CBDE-5E14-DEF34EBF65E78E88',
+        'wrst-hq': 'https://www.nps.gov/media/webcam/view.htm?id=F91F11B2-C421-28C4-16C717FF1FF2CB72',
+      };
+
       function areaOf(id) {
         for (const p of PARKS) {
           const a = p.areas.find(a => a.cameras.some(c => c.id === id));
@@ -1660,6 +1799,16 @@
         // Image cameras backed by a live feed get a link to the livestream page.
         stageLive.hidden = isStream || !cam.live;
         if (cam.live) stageLive.href = cam.live;
+        // Link to the camera's official NPS page (for status/details) when known.
+        // The camera name itself is the link, so no extra button clutters the bar.
+        const npsPage = CAM_PAGES[id];
+        if (npsPage) {
+          stageTitle.href = npsPage;
+          stageTitle.title = 'View this camera on nps.gov';
+        } else {
+          stageTitle.removeAttribute('href');
+          stageTitle.removeAttribute('title');
+        }
         if (isStream) {
           stageImage.hidden = true;
           const frame = replaceStageStream();
@@ -1813,6 +1962,9 @@
       function updateCount() { stageCount.textContent = 'next in ' + remaining + 's'; }
 
       function tick() {
+        // Don't refresh while the tab is hidden — saves bandwidth/battery. We
+        // resume (with an immediate refresh) on visibilitychange.
+        if (document.hidden) return;
         remaining -= 1;
         if (remaining <= 0) {
           refreshAll();
@@ -1820,6 +1972,12 @@
         }
         updateCount();
       }
+
+      // Resume promptly when the tab becomes visible again: refresh once so the
+      // frames aren't stale, and restart the countdown.
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) { refreshAll(); resetTimer(); }
+      });
 
       intervalInput.addEventListener('change', () => { resetTimer(); saveSession(); });
 
