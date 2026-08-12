@@ -10,7 +10,7 @@ CSS, and vanilla JavaScript in one file. No build step, no framework, no
 package manager. Open the file in a browser to run it.
 
 Covers ~35 National Parks (~200+ feeds): refreshing still images **and** live
-video streams, each tagged Online / Live / Daytime / Stale / Offline / Stream.
+video streams, each tagged Online / Live / Air Quality / Stale / Offline / Stream.
 The camera
 list was seeded from the NPS webcam catalog (see "Camera catalog & the NPS Solr
 API" below).
@@ -73,20 +73,41 @@ All application code is inside the single IIFE `<script>` at the bottom of
   - **Live** (green) — image cameras that also expose an external live-video
     feed (`cam.live` is set); same green styling as Online, plus a
     **Watch live ↗** button on the detail page.
-  - **Daytime** (amber) — NPS Air Resources air-quality cams (URL matches
-    `AIRQUALITY_RE` = `featurecontent/ard/webcams`). They refresh only in
-    daylight and freeze overnight, so their `name` ends with
-    `(Air Quality · daytime only)`.
+  - **Air Quality** (amber) — NPS Air Resources air-quality cams (URL matches
+    `AIRQUALITY_RE` = `featurecontent/ard/webcams`). Their update cadence varies
+    (some near-live, some daytime-only) and their host sends no CORS headers so
+    we can't read a real age — hence a neutral label rather than a freshness
+    claim. Some `name`s still end with `(Air Quality · daytime only)`.
   - **Stale · Nh/Nd** (amber) — measured frame age exceeds `STALE_MS` (1h). Age
     comes from a throttled `HEAD` read of `Last-Modified`, which is only
     readable cross-origin for hosts that send CORS headers — in practice
     `volcanoes.usgs.gov` and `cdn.pixelcaster.com` (`AGE_READABLE_RE`).
   - **Offline** (red) — `off: true`, or an image that keeps failing to load.
   - **Stream** (blue) — `type: 'stream'`.
+- **Lazy loading** — an `IntersectionObserver` (`imgObserver`, `rootMargin`
+  400px) tracks which registered `<img>`s are near the viewport. Each ref
+  carries a `visible` flag; the observer kicks off the first load when a tile
+  scrolls in, and `refreshAll()` only re-fetches cameras with a visible ref, so
+  offscreen tiles in big parks don't load or refresh until needed. (Falls back
+  to eager loading if `IntersectionObserver` is unavailable.)
+- **Last-updated readout** — the detail stage shows `updated Nm ago`
+  (`stageUpdated`, via `updateUpdatedLabel`) whenever a real frame age is known,
+  i.e. only for the CORS-readable hosts in `AGE_READABLE_RE`. Grid cards in the
+  current-park view show the same measured age in their bottom-right `.time`
+  label (`ageLabel`); it's left blank when no age is measurable rather than
+  claiming "live" for feeds we can't verify.
+- **Keyboard nav** — a single `document` `keydown` handler: `/` focuses search;
+  in detail view **←/→** (and ↑/↓) step through `navigableCameras()` (current
+  park, skipping non-inline streams so no external tab opens) and **Esc**
+  returns to the grid. Ignored while typing in an input/select.
+- **Share** — the detail bar's **Share** button copies `location.href` (the
+  deep-linkable hash URL) via `navigator.clipboard`, falling back to a hidden
+  `textarea` + `execCommand('copy')`; shows a transient `Copied!` label.
 - **Search & filters** — the search box matches camera + park name across
   **all** parks (results grouped by park); the **Hide offline** and **Streams**
   chips filter via `passesFilters()`. `refreshAll()` refreshes every visible
   `<img>` (tracked in `imgRefs`), so search results from other parks update too.
+  Empty results render a friendly message via `gridEmpty()`.
 - **Session persistence** — selected park + refresh interval are saved to
   `localStorage` (`nps-webcam-state`) and restored on load.
 
@@ -115,9 +136,9 @@ All application code is inside the single IIFE `<script>` at the bottom of
 - Navigation uses `history.pushState`; a `popstate` handler (`applyHashState`)
   re-applies the view so browser **Back/Forward** work. Re-applies are
   suppressed from creating new entries (`suppressHistory`). The in-app
-  "← All cameras" button uses `history.back()` when there's app history
-  (`history.state.d > 0`), else `openGrid()`, so a deep-linked detail's Back
-  drops to the park grid instead of leaving the page.
+  "← All cameras" button always calls `openGrid()` (returns to the current
+  park's grid regardless of how many cameras were opened via the sidebar);
+  browser Back/Forward still step through history entry-by-entry independently.
 
 ## Camera catalog & the NPS Solr API
 The authoritative list of every NPS webcam is the Solr endpoint behind

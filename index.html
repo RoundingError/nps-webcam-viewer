@@ -471,9 +471,11 @@
             <span class="area-tag" id="stageArea"></span>
             <button class="iconBtn favBtn" id="stageFav">☆ Favorite</button>
             <div class="spacer"></div>
+            <span class="count" id="stageUpdated" hidden></span>
             <span class="count" id="stageCount">next in 60s</span>
             <a class="iconBtn" id="stageWatch" target="_blank" rel="noopener" hidden>Watch ↗</a>
             <a class="iconBtn" id="stageLive" target="_blank" rel="noopener" hidden>Watch live ↗</a>
+            <button class="iconBtn" id="stageShare">Share</button>
             <button class="iconBtn" id="stageRefresh">Refresh</button>
             <button class="iconBtn" id="stageSave">Save image</button>
           </div>
@@ -1191,8 +1193,10 @@
       const stageTitle = document.getElementById('stageTitle');
       const stageArea = document.getElementById('stageArea');
       const stageCount = document.getElementById('stageCount');
+      const stageUpdated = document.getElementById('stageUpdated');
       const stageRefresh = document.getElementById('stageRefresh');
       const stageSave = document.getElementById('stageSave');
+      const stageShare = document.getElementById('stageShare');
       const stageWatch = document.getElementById('stageWatch');
       const stageLive = document.getElementById('stageLive');
       const stageFav = document.getElementById('stageFav');
@@ -1297,17 +1301,37 @@
       const retryState = {};   // id -> { tries, timer }
       const lastGoodSrc = {};  // id -> most recently loaded frame URL (for instant swaps)
 
-      function registerImg(id, imgEl, onOk, onFail, badgeEl) {
-        (imgRefs[id] = imgRefs[id] || []).push({ el: imgEl, onOk: onOk, onFail: onFail, badge: badgeEl || null });
+      function registerImg(id, imgEl, onOk, onFail, badgeEl, timeEl) {
+        const ref = { el: imgEl, onOk: onOk, onFail: onFail, badge: badgeEl || null, time: timeEl || null, visible: !imgObserver };
+        (imgRefs[id] = imgRefs[id] || []).push(ref);
         // Show the cached frame immediately so swaps feel instant.
         if (lastGoodSrc[id]) {
           imgEl.src = lastGoodSrc[id];
           if (onOk) onOk();
         }
+        // Lazy-load: only fetch frames for tiles near the viewport. The observer
+        // flips `visible` and kicks off the first load when a tile scrolls in.
+        if (imgObserver) { imgEl.__camId = id; imgEl.__ref = ref; imgObserver.observe(imgEl); }
         applyBadge(id);
       }
 
+      // Refresh (or first-load) only cameras with at least one on-screen <img>.
+      const imgObserver = ('IntersectionObserver' in window)
+        ? new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+              const ref = entry.target.__ref;
+              if (!ref) return;
+              ref.visible = entry.isIntersecting;
+              if (entry.isIntersecting) {
+                const id = entry.target.__camId;
+                if (!lastGoodSrc[id]) refreshCamera(id);
+              }
+            });
+          }, { rootMargin: '400px' })
+        : null;
+
       function clearImgRefs() {
+        if (imgObserver) imgObserver.disconnect();
         Object.keys(imgRefs).forEach(k => delete imgRefs[k]);
         Object.keys(retryState).forEach(k => {
           if (retryState[k].timer) clearTimeout(retryState[k].timer);
@@ -1360,9 +1384,39 @@
         } else if (rec && rec.ms != null && rec.ms > STALE_MS) {
           state = 'stale'; label = 'Stale · ' + humanAge(rec.ms);
         } else if ((!rec || rec.ms == null) && AIRQUALITY_RE.test(cam.url)) {
-          state = 'daytime'; label = 'Daytime';
+          // NPS air-quality cams: we can't read their age (no CORS), and update
+          // cadence varies (some are near-live, others daytime-only), so use a
+          // neutral label instead of claiming they're frozen overnight.
+          state = 'daytime'; label = 'Air Quality';
         }
-        (imgRefs[id] || []).forEach(r => setBadge(r.badge, state, label));
+        (imgRefs[id] || []).forEach(r => {
+          setBadge(r.badge, state, label);
+          if (r.time) r.time.textContent = ageLabel(id, cam);
+        });
+        if (id === activeId) updateUpdatedLabel(id);
+      }
+
+      // Bottom-right card label: only show a real, measured frame age. We don't
+      // claim "live" for feeds we can't verify (some may be stale). Empty when
+      // unknown; "offline" for inactive cams.
+      function ageLabel(id, cam) {
+        const rec = ageInfo[id];
+        if (cam.off) return 'offline';
+        if (rec && rec.ms != null) return 'updated ' + humanAge(rec.ms) + ' ago';
+        return '';
+      }
+
+      // Detail-stage "Updated Nm ago" readout, shown only when we have a real
+      // measured frame age (CORS-readable hosts); hidden otherwise.
+      function updateUpdatedLabel(id) {
+        if (!stageUpdated) return;
+        const rec = ageInfo[id];
+        if (rec && rec.ms != null) {
+          stageUpdated.textContent = 'updated ' + humanAge(rec.ms) + ' ago';
+          stageUpdated.hidden = false;
+        } else {
+          stageUpdated.hidden = true;
+        }
       }
 
       // For CORS-readable hosts, HEAD the frame and read Last-Modified to get its
@@ -1426,8 +1480,12 @@
       function refreshAll() {
         // Refresh every camera that currently has a visible <img> registered
         // (current park, favorites, sidebar, or search results). Streams have no
-        // registered image, so they are naturally skipped.
-        Object.keys(imgRefs).forEach(id => refreshCamera(id));
+        // registered image, so they are naturally skipped. With the observer
+        // active, offscreen tiles are skipped until they scroll into view.
+        Object.keys(imgRefs).forEach(id => {
+          const refs = imgRefs[id] || [];
+          if (!imgObserver || refs.some(r => r.visible)) refreshCamera(id);
+        });
       }
 
 
@@ -1440,7 +1498,7 @@
         card.className = 'card';
         const subtitle = showPark
           ? parkNameOf(cam.id) + ' · ' + areaOf(cam.id)
-          : (cam.type === 'stream' ? 'live stream' : 'live');
+          : (cam.type === 'stream' ? 'live stream' : '');
         const isStream = cam.type === 'stream';
         const poster = isStream ? streamPoster(cam) : null;
         const media = isStream
@@ -1464,7 +1522,10 @@
           const img = card.querySelector('img');
           const err = card.querySelector('.imgError');
           const badge = card.querySelector('.badge');
-          registerImg(cam.id, img, () => { err.hidden = true; }, () => { err.hidden = false; }, badge);
+          // Only cards in the current-park view (no park subtitle) get a live
+          // age readout; favorites/search cards keep their "Park · Area" label.
+          const timeEl = showPark ? null : card.querySelector('.time');
+          registerImg(cam.id, img, () => { err.hidden = true; }, () => { err.hidden = false; }, badge, timeEl);
         }
         star.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -1595,6 +1656,7 @@
         stageRefresh.hidden = isStream;
         stageCount.hidden = isStream;
         stageWatch.hidden = !isStream;
+        stageUpdated.hidden = true;
         // Image cameras backed by a live feed get a link to the livestream page.
         stageLive.hidden = isStream || !cam.live;
         if (cam.live) stageLive.href = cam.live;
@@ -1610,6 +1672,7 @@
           replaceStageStream();
           stageImage.hidden = false;
           registerImg(id, stageImage, null, null, stageBadge);
+          updateUpdatedLabel(id);
         }
         buildSidebar();
         gridView.hidden = true;
@@ -1650,10 +1713,9 @@
         saveSession();
       }
 
-      backBtn.addEventListener('click', () => {
-        if (history.state && history.state.d > 0) history.back();
-        else openGrid();
-      });
+      // "← All cameras" always returns to the current park's grid, regardless
+      // of how many cameras were visited via the sidebar (don't step back one).
+      backBtn.addEventListener('click', () => { openGrid(); });
       stageRefresh.addEventListener('click', () => { refreshAll(); resetTimer(); });
       stageFav.addEventListener('click', () => {
         toggleFav(activeId);
@@ -1717,6 +1779,35 @@
 
       stageSave.addEventListener('click', saveCurrent);
 
+      // Copy a shareable link to the current view (the URL hash is deep-linkable).
+      async function shareCurrent() {
+        const url = location.href;
+        const done = (ok) => {
+          const original = 'Share';
+          stageShare.textContent = ok ? 'Copied!' : 'Copy failed';
+          stageShare.disabled = true;
+          setTimeout(() => { stageShare.textContent = original; stageShare.disabled = false; }, 1500);
+        };
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(url);
+          } else {
+            // Fallback for insecure/older contexts.
+            const ta = document.createElement('textarea');
+            ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            const ok = document.execCommand('copy');
+            ta.remove();
+            if (!ok) throw new Error('execCommand failed');
+          }
+          done(true);
+        } catch (e) {
+          done(false);
+        }
+      }
+
+      stageShare.addEventListener('click', shareCurrent);
+
       // ---------- Timer ----------
       function resetTimer() { remaining = intervalSeconds(); updateCount(); }
       function updateCount() { stageCount.textContent = 'next in ' + remaining + 's'; }
@@ -1779,6 +1870,35 @@
       });
       chipOffline.addEventListener('click', () => { hideOffline = !hideOffline; chipOffline.classList.toggle('on', hideOffline); applyGridChange(); });
       chipStreams.addEventListener('click', () => { streamsOnly = !streamsOnly; chipStreams.classList.toggle('on', streamsOnly); applyGridChange(); });
+
+      // ---------- Keyboard navigation ----------
+      // Cameras in the current park that can be shown inline (skip streams that
+      // would open an external tab, so arrow-stepping never launches new tabs).
+      function navigableCameras() {
+        return currentCameras().filter(c => !(c.type === 'stream' && !canEmbedInline(c)));
+      }
+      function stepDetail(dir) {
+        const list = navigableCameras();
+        if (!list.length) return;
+        const i = list.findIndex(c => c.id === activeId);
+        const next = list[(i + dir + list.length) % list.length];
+        if (next) openDetail(next.id);
+      }
+      document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const t = e.target;
+        const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+        // "/" focuses search from anywhere except while typing.
+        if (e.key === '/' && !typing) { e.preventDefault(); searchInput.focus(); searchInput.select(); return; }
+        if (typing) { if (e.key === 'Escape') t.blur(); return; }
+        if (e.key === 'Escape') {
+          if (activeId !== null) { e.preventDefault(); openGrid(); }
+        } else if (activeId !== null && (e.key === 'ArrowRight' || e.key === 'ArrowDown')) {
+          e.preventDefault(); stepDetail(1);
+        } else if (activeId !== null && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) {
+          e.preventDefault(); stepDetail(-1);
+        }
+      });
 
       // ---------- Init ----------
       (function initState() {
