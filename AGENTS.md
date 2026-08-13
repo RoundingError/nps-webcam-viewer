@@ -64,8 +64,17 @@ show). Navigation tiers: **home → park grid → camera detail**.
   **★ Favorites** section renders first when any favorites exist. A search box
   and filter chips (**Hide offline**, **Streams**) live in the top bar.
 - **Detail view** — one large "stage" (image, or an embedded stream player)
-  plus a sidebar of other cameras (grouped by area, favorites first). Image
-  cameras show Refresh + Save image; streams show a **Watch ↗** link instead.
+  plus a sidebar of other cameras. Image cameras show Refresh + Save image;
+  streams show a **Watch ↗** link instead. The image stage has an overlay
+  **fullscreen** toggle (`stageFull`, image cams only) that fullscreens the whole
+  `.stage` — image *and* the info/button bar — so the name/Save/Share stay usable
+  and small frames scale up (`object-fit: contain`, no crop). Toggle via the
+  overlay icon, clicking the image, or the `f` key; `Esc` exits.
+  - The sidebar list (`buildSidebar`) groups cameras into **collapsible groups**
+    (`.side-group`, header shows name + count + chevron). Area groups default
+    expanded (in-session only); the **★ Favorites** group's collapsed state
+    persists (`nps-webcam-fav-collapsed`). The group holding the active camera is
+    always force-expanded.
 - The **"National Park Webcams" eyebrow** (`homeLink`) returns to home from
   anywhere; the back button is contextual (detail → park grid, grid → home).
 - Navigating pushes browser history; the URL hash is shareable/deep-linkable
@@ -123,11 +132,13 @@ show). Navigation tiers: **home → park grid → camera detail**.
   claiming "live" for feeds we can't verify.
 - **Keyboard nav** — a single `document` `keydown` handler: `/` focuses search;
   in detail view **←/→** (and ↑/↓) step through `navigableCameras()` (current
-  park, skipping non-inline streams so no external tab opens) and **Esc**
-  returns to the grid. Ignored while typing in an input/select.
-- **Share** — the detail bar's **Share** button copies `location.href` (the
-  deep-linkable hash URL) via `navigator.clipboard`, falling back to a hidden
-  `textarea` + `execCommand('copy')`; shows a transient `Copied!` label.
+  park, skipping non-inline streams so no external tab opens), **f** toggles
+  fullscreen (image cams), and **Esc** returns to the grid. Ignored while typing
+  in an input/select.
+- **Share** — the detail bar's **Share** button (icon + label) prefers the native
+  share sheet via `navigator.share` (mobile) with the camera name + deep-link
+  URL, then falls back to `navigator.clipboard`, then a hidden `textarea` +
+  `execCommand('copy')`; shows a transient `Copied!` label on the copy paths.
 - **Search & filters** — the search box matches camera + park name across
   **all** parks (results grouped by park); the **Hide offline** and **Streams**
   chips filter via `passesFilters()`. `refreshAll()` refreshes every visible
@@ -168,6 +179,19 @@ show). Navigation tiers: **home → park grid → camera detail**.
   a powered-off cam still serving an image) can't be auto-detected — canvas
   pixel reads are CORS-blocked for cross-origin images. Use `hero: true` to pin
   a known-good camera for such parks.
+
+## Responsive / mobile (≤820px, phone tweaks ≤560px)
+- The top bar's grid-only controls (search, filter chips, Park/Refresh selects)
+  are hidden on the **detail** view (`body[data-view]`) to keep the pinned
+  header compact; a `--topbar-h` CSS var (tracked via `ResizeObserver`) measures
+  the wrapped bar height.
+- **Detail is a fixed-height flex column:** the `.stage` is fixed on top and the
+  `.sidebar` scrolls internally (mirrors desktop side-by-side), so the current
+  camera stays put while browsing others. The `.sidebar-toggle` ("Other cameras
+  (N)") is `position: sticky` at the top of that scroller so the list can be
+  collapsed/expanded from any scroll position.
+- Home uses a denser 2-col park grid; the detail `.stage-img` is capped
+  (`max-height`) so the list is always reachable.
 
 ## State, URLs & history
 - `localStorage`: `nps-webcam-state` = `{ park: <slug>, interval }`;

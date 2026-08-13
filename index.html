@@ -403,6 +403,37 @@
       display: block;
     }
     .stage-img img[hidden] { display: none; }
+    .stage-img.zoomable img { cursor: zoom-in; }
+    /* Overlay fullscreen toggle on the image (image cameras only). */
+    .fsBtn {
+      position: absolute;
+      top: 10px; right: 10px;
+      width: 34px; height: 34px;
+      display: none;
+      align-items: center; justify-content: center;
+      border: none; border-radius: 8px; padding: 0;
+      background: rgba(0,0,0,.5); backdrop-filter: blur(4px);
+      color: rgba(255,255,255,.85); cursor: pointer;
+      transition: background .15s, transform .12s;
+    }
+    .stage-img.zoomable .fsBtn { display: inline-flex; }
+    .fsBtn:hover { background: rgba(0,0,0,.72); transform: scale(1.06); }
+    .fsBtn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .fsBtn .icon-exit { display: none; }
+    /* Native fullscreen: the whole stage goes fullscreen so the info/button bar
+       stays visible; the image area fills the remaining space on black. */
+    .stage:fullscreen { width: 100vw; height: 100vh; border: 0; border-radius: 0; }
+    .stage:fullscreen .stage-img { background: #000; }
+    /* Scale small webcam frames up to fill the fullscreen frame (aspect ratio
+       preserved via object-fit; upscaling is smoothed). */
+    .stage:fullscreen .stage-img img {
+      width: 100%; height: 100%;
+      max-width: none; max-height: none;
+      object-fit: contain;
+      cursor: zoom-out;
+    }
+    .stage.is-full .fsBtn .icon-enter { display: none; }
+    .stage.is-full .fsBtn .icon-exit { display: inline; }
 
     .stage-bar {
       display: flex;
@@ -439,6 +470,9 @@
       transition: background .15s, border-color .15s;
     }
     .iconBtn:hover { background: #1e2530; border-color: #313a48; }
+    /* Icon + label buttons (e.g. Share). */
+    .iconBtn:has(.ic) { display: inline-flex; align-items: center; gap: 7px; }
+    .iconBtn .ic { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
     .sidebar {
       display: flex;
@@ -454,6 +488,56 @@
       margin: 4px 2px;
       font-weight: 600;
     }
+    /* On desktop the toggle is a static heading; the list is always shown. */
+    .sidebar-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      width: 100%;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font: inherit;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      font-weight: 700;
+      padding: 2px 2px 6px;
+      cursor: default;
+    }
+    .sidebar-toggle .st-chev { display: none; }
+    /* Collapsible camera groups within the sidebar. */
+    .side-group { margin-bottom: 6px; }
+    .side-group-head {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      width: 100%;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font: inherit;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      font-weight: 700;
+      padding: 6px 2px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .side-group-head:hover { color: var(--text); }
+    .side-group-head .sg-chev {
+      width: 7px; height: 7px;
+      border-right: 2px solid currentColor;
+      border-bottom: 2px solid currentColor;
+      transform: rotate(45deg);
+      transition: transform .18s ease;
+      flex: none;
+    }
+    .side-group.collapsed .sg-chev { transform: rotate(-45deg); }
+    .side-group .sg-count { color: #5c6470; font-weight: 600; }
+    .side-group.collapsed .sg-body { display: none; }
     .side-cam {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -464,6 +548,9 @@
     }
     .side-cam:hover { transform: translateY(-2px); border-color: #33507e; }
     .side-cam.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    /* Space between feeds in the panel (desktop block list); mobile uses flex gap. */
+    #sideList .side-cam { margin-bottom: 12px; }
+    .sg-body .side-cam:last-child { margin-bottom: 0; }
     .side-cam .stub {
       position: relative;
       aspect-ratio: 16 / 9;
@@ -494,10 +581,84 @@
     .imgError[hidden] { display: none; }
 
     @media (max-width: 820px) {
-      .detail { grid-template-columns: 1fr; height: auto; }
-      .sidebar { flex-direction: row; overflow-x: auto; }
-      .sidebar h2 { display: none; }
-      .side-cam { min-width: 180px; }
+      /* Detail fills the space under the top bar; the stage is fixed on top and
+         the "other cameras" panel scrolls internally (mirrors desktop), so the
+         current camera stays put while browsing others. */
+      #detailView { padding: 10px; }
+      .detail {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        height: calc(100vh - var(--topbar-h, 56px) - 20px);
+        height: calc(100dvh - var(--topbar-h, 56px) - 20px);
+      }
+      /* On the detail page these are grid-browsing controls; hide them so the
+         pinned camera header stays compact (search still works via back/grid). */
+      body[data-view="detail"] .park-pill,
+      body[data-view="detail"] .refresh-pill,
+      body[data-view="detail"] #chipOffline,
+      body[data-view="detail"] #chipStreams,
+      body[data-view="detail"] .pill.search { display: none; }
+      .stage { flex: 0 0 auto; }
+      .stage-img { max-height: 46vh; min-height: 200px; }
+      /* The panel is the scroll container; its header sticks at the top so the
+         list can be collapsed/expanded without scrolling back up. */
+      .sidebar {
+        display: block;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        margin-top: 12px;
+      }
+      .sidebar-toggle {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        cursor: pointer;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-size: 12px;
+      }
+      .sidebar-toggle .st-chev {
+        display: inline-block;
+        width: 8px; height: 8px;
+        border-right: 2px solid var(--muted);
+        border-bottom: 2px solid var(--muted);
+        transform: rotate(45deg);
+        transition: transform .18s ease;
+        margin-right: 3px;
+      }
+      .sidebar.collapsed .sidebar-toggle .st-chev { transform: rotate(-45deg); }
+      /* Vertical camera list under the sticky header. */
+      #sideList { margin-top: 12px; }
+      .sg-body { display: flex; flex-direction: column; gap: 12px; }
+      #sideList .side-cam { margin-bottom: 0; }
+      .sidebar.collapsed #sideList { display: none; }
+      .side-cam { min-width: 0; }
+    }
+
+    /* ---------- Phones ---------- */
+    @media (max-width: 560px) {
+      .topbar { padding: 11px 14px; gap: 10px; }
+      .view { padding: 14px; }
+      .brand h1 { font-size: 18px; }
+      /* Search takes its own full-width row; filters/dropdowns wrap below. */
+      .pill.search { flex-basis: 100%; }
+      .backBtn { padding: 7px 12px; font-size: 12px; }
+
+      /* Home: denser park grid + smaller hero. */
+      .home { gap: 22px; }
+      .park-grid { grid-template-columns: repeat(auto-fill, minmax(144px, 1fr)); gap: 12px; }
+      .hero { padding: 20px 18px; }
+      .hero-title { font-size: 23px; }
+      .hero-sub { font-size: 14px; }
+
+      /* Detail bar wraps so its buttons never clip off the right edge. */
+      .stage-bar { flex-wrap: wrap; gap: 10px; padding: 10px 12px; }
+      .stage-bar .spacer { flex-basis: 100%; height: 0; }
+      .stage-bar .iconBtn, .stage-bar .favBtn { flex: 1 1 auto; justify-content: center; text-align: center; }
     }
   </style>
 </head>
@@ -540,7 +701,7 @@
     <section class="view" id="homeView">
       <div class="home">
         <div class="hero">
-          <h2 class="hero-title">The national parks, live.</h2>
+          <h2 class="hero-title">The National Parks, live.</h2>
           <p class="hero-sub">Refreshing views from <strong id="statCams">…</strong> webcams across
           <strong id="statParks">…</strong> national parks — geysers, glaciers, coastlines,
           wildlife and more.</p>
@@ -564,7 +725,12 @@
         <div class="stage">
           <div class="stage-img">
             <span class="badge" id="stageBadge"><span class="dot"></span> <span class="badge-label">Online</span></span>
+            <button class="fsBtn" id="stageFull" title="Fullscreen (f)" aria-label="Toggle fullscreen">
+              <svg viewBox="0 0 24 24" class="icon-enter" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+              <svg viewBox="0 0 24 24" class="icon-exit" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+            </button>
             <img id="stageImage" alt="" />
+            <div class="imgError" id="stageError" hidden>Unavailable</div>
             <iframe id="stageStream" hidden allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
           </div>
           <div class="stage-bar">
@@ -576,13 +742,19 @@
             <span class="count" id="stageCount">next in 60s</span>
             <a class="iconBtn" id="stageWatch" target="_blank" rel="noopener" hidden>Watch ↗</a>
             <a class="iconBtn" id="stageLive" target="_blank" rel="noopener" hidden>Watch live ↗</a>
-            <button class="iconBtn" id="stageShare">Share</button>
+            <button class="iconBtn" id="stageShare" title="Share this camera">
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
+              <span class="lbl">Share</span>
+            </button>
             <button class="iconBtn" id="stageRefresh">Refresh</button>
             <button class="iconBtn" id="stageSave">Save image</button>
           </div>
         </div>
-        <div class="sidebar">
-          <h2>Other cameras</h2>
+        <div class="sidebar" id="sidebar">
+          <button class="sidebar-toggle" id="sidebarToggle" aria-expanded="true" aria-controls="sideList">
+            <span class="st-label">Other cameras</span>
+            <span class="st-chev" aria-hidden="true"></span>
+          </button>
           <div id="sideList"></div>
         </div>
       </div>
@@ -1390,6 +1562,14 @@
         if (raw) favorites = JSON.parse(raw).filter(id => camById(id));
       } catch (e) { favorites = []; }
 
+      // Sidebar Favorites group collapsed state (the only group we persist).
+      const FAVGROUP_KEY = 'nps-webcam-fav-collapsed';
+      let favGroupCollapsed = false;
+      try { favGroupCollapsed = localStorage.getItem(FAVGROUP_KEY) === '1'; } catch (e) {}
+      function saveFavGroupState() {
+        try { localStorage.setItem(FAVGROUP_KEY, favGroupCollapsed ? '1' : '0'); } catch (e) {}
+      }
+
       function isFav(id) { return favorites.indexOf(id) !== -1; }
       function saveFavs() {
         try { localStorage.setItem(FAV_KEY, JSON.stringify(favorites)); } catch (e) {}
@@ -1435,6 +1615,7 @@
         return fresh;
       }
       const stageBadge = document.getElementById('stageBadge');
+      const stageError = document.getElementById('stageError');
       const stageTitle = document.getElementById('stageTitle');
       const stageArea = document.getElementById('stageArea');
       const stageCount = document.getElementById('stageCount');
@@ -1442,10 +1623,24 @@
       const stageRefresh = document.getElementById('stageRefresh');
       const stageSave = document.getElementById('stageSave');
       const stageShare = document.getElementById('stageShare');
+      const stageFull = document.getElementById('stageFull');
+      const stageEl = document.querySelector('.stage');
+      const stageImgWrap = document.querySelector('.stage-img');
       const stageWatch = document.getElementById('stageWatch');
       const stageLive = document.getElementById('stageLive');
       const stageFav = document.getElementById('stageFav');
       const sideList = document.getElementById('sideList');
+      const sidebar = document.getElementById('sidebar');
+      const sidebarToggle = document.getElementById('sidebarToggle');
+      const sidebarLabel = sidebarToggle.querySelector('.st-label');
+      const mobileMQ = window.matchMedia('(max-width: 820px)');
+      // Collapse the "Other cameras" list by default on mobile to declutter;
+      // tapping the bar expands it. On desktop it's always shown.
+      sidebarToggle.addEventListener('click', () => {
+        if (!mobileMQ.matches) return;
+        const collapsed = sidebar.classList.toggle('collapsed');
+        sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
+      });
       const searchInput = document.getElementById('searchInput');
       const chipOffline = document.getElementById('chipOffline');
       const chipStreams = document.getElementById('chipStreams');
@@ -1567,10 +1762,14 @@
       function registerImg(id, imgEl, onOk, onFail, badgeEl, timeEl) {
         const ref = { el: imgEl, onOk: onOk, onFail: onFail, badge: badgeEl || null, time: timeEl || null, visible: !imgObserver };
         (imgRefs[id] = imgRefs[id] || []).push(ref);
-        // Show the cached frame immediately so swaps feel instant.
+        // Show the cached frame immediately so swaps feel instant. When there's
+        // no cached frame for this camera, clear the element so it never shows a
+        // previously-viewed camera's frame (matters for the reused stage image).
         if (lastGoodSrc[id]) {
           imgEl.src = lastGoodSrc[id];
           if (onOk) onOk();
+        } else {
+          imgEl.removeAttribute('src');
         }
         // Lazy-load: only fetch frames for tiles near the viewport. The observer
         // flips `visible` and kicks off the first load when a tile scrolls in.
@@ -1931,20 +2130,50 @@
       function buildSidebar() {
         sideList.innerHTML = '';
 
-        const favs = favCameras();
-        if (favs.length) {
-          const heading = document.createElement('h2');
-          heading.textContent = '★ Favorites';
-          sideList.appendChild(heading);
-          favs.forEach(cam => sideList.appendChild(makeSideCam(cam)));
+        // A collapsible group: header (name + count + chevron) over a body of
+        // cameras. Favorites' collapsed state persists; area groups default
+        // expanded (in-session only) but always expand the active camera's group.
+        function sideGroup(title, cams, opts) {
+          opts = opts || {};
+          const group = document.createElement('div');
+          group.className = 'side-group';
+          const head = document.createElement('button');
+          head.className = 'side-group-head';
+          head.innerHTML = '<span class="sg-chev"></span><span class="sg-name"></span>' +
+            '<span class="sg-count">' + cams.length + '</span>';
+          head.querySelector('.sg-name').textContent = title;
+          const body = document.createElement('div');
+          body.className = 'sg-body';
+          cams.forEach(cam => body.appendChild(makeSideCam(cam)));
+          group.appendChild(head);
+          group.appendChild(body);
+
+          const hasActive = cams.some(c => c.id === activeId);
+          let collapsed = opts.persistKey ? favGroupCollapsed : false;
+          if (hasActive) collapsed = false;   // never hide the camera being viewed
+          group.classList.toggle('collapsed', collapsed);
+
+          head.addEventListener('click', () => {
+            const nowCollapsed = group.classList.toggle('collapsed');
+            if (opts.persistKey) { favGroupCollapsed = nowCollapsed; saveFavGroupState(); }
+          });
+          return group;
         }
 
-        AREAS.forEach(group => {
-          const heading = document.createElement('h2');
-          heading.textContent = group.area;
-          sideList.appendChild(heading);
-          group.cameras.forEach(cam => sideList.appendChild(makeSideCam(cam)));
-        });
+        const favs = favCameras();
+        if (favs.length) sideList.appendChild(sideGroup('★ Favorites', favs, { persistKey: 'fav' }));
+        AREAS.forEach(group => sideList.appendChild(sideGroup(group.area, group.cameras)));
+
+        // Update the toggle count and collapse the whole panel by default on mobile.
+        const n = sideList.querySelectorAll('.side-cam').length;
+        sidebarLabel.textContent = 'Other cameras (' + n + ')';
+        if (mobileMQ.matches) {
+          sidebar.classList.add('collapsed');
+          sidebarToggle.setAttribute('aria-expanded', 'false');
+        } else {
+          sidebar.classList.remove('collapsed');
+          sidebarToggle.setAttribute('aria-expanded', 'true');
+        }
       }
 
       // ---------- Navigation ----------
@@ -1981,6 +2210,7 @@
         stageRefresh.hidden = isStream;
         stageCount.hidden = isStream;
         stageWatch.hidden = !isStream;
+        stageImgWrap.classList.toggle('zoomable', !isStream);
         stageUpdated.hidden = true;
         // Image cameras backed by a live feed get a link to the livestream page.
         stageLive.hidden = isStream || !cam.live;
@@ -2006,7 +2236,8 @@
         } else {
           replaceStageStream();
           stageImage.hidden = false;
-          registerImg(id, stageImage, null, null, stageBadge);
+          stageError.hidden = true;
+          registerImg(id, stageImage, () => { stageError.hidden = true; }, () => { stageError.hidden = false; }, stageBadge);
           updateUpdatedLabel(id);
         }
         buildSidebar();
@@ -2142,20 +2373,28 @@
 
       stageSave.addEventListener('click', saveCurrent);
 
-      // Copy a shareable link to the current view (the URL hash is deep-linkable).
+      // Share the current view. Prefers the native share sheet (mobile), then
+      // clipboard copy, then a legacy textarea copy. The URL hash is deep-linkable.
+      const shareLbl = stageShare.querySelector('.lbl');
+      function flashShare(text) {
+        const original = 'Share';
+        shareLbl.textContent = text;
+        stageShare.disabled = true;
+        setTimeout(() => { shareLbl.textContent = original; stageShare.disabled = false; }, 1500);
+      }
       async function shareCurrent() {
         const url = location.href;
-        const done = (ok) => {
-          const original = 'Share';
-          stageShare.textContent = ok ? 'Copied!' : 'Copy failed';
-          stageShare.disabled = true;
-          setTimeout(() => { stageShare.textContent = original; stageShare.disabled = false; }, 1500);
-        };
+        const cam = camById(activeId);
+        const title = cam ? cam.name + ' — National Park Webcams' : 'National Park Webcams';
+        // Native share sheet (mostly mobile). Bail quietly if the user cancels.
+        if (navigator.share) {
+          try { await navigator.share({ title, url }); return; }
+          catch (e) { if (e && e.name === 'AbortError') return; /* else fall through */ }
+        }
         try {
           if (navigator.clipboard && navigator.clipboard.writeText) {
             await navigator.clipboard.writeText(url);
           } else {
-            // Fallback for insecure/older contexts.
             const ta = document.createElement('textarea');
             ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
             document.body.appendChild(ta); ta.select();
@@ -2163,13 +2402,34 @@
             ta.remove();
             if (!ok) throw new Error('execCommand failed');
           }
-          done(true);
+          flashShare('Copied!');
         } catch (e) {
-          done(false);
+          flashShare('Copy failed');
         }
       }
 
       stageShare.addEventListener('click', shareCurrent);
+
+      // Fullscreen the whole stage (image + info/button bar) so users can still
+      // see the camera name and save/share while fullscreen. The live image keeps
+      // refreshing. Streams have their own player fullscreen, so image cams only.
+      function toggleFullscreen() {
+        if (document.fullscreenElement) { document.exitFullscreen(); return; }
+        if (!detailView || detailView.hidden) return;
+        const cam = camById(activeId);
+        if (!cam || cam.type === 'stream') return;
+        if (stageEl.requestFullscreen) stageEl.requestFullscreen().catch(() => {});
+      }
+      stageFull.addEventListener('click', (e) => { e.stopPropagation(); toggleFullscreen(); });
+      stageImgWrap.addEventListener('click', (e) => {
+        // Click the image (not the badge/overlay button) to toggle fullscreen.
+        if (e.target === stageImage) toggleFullscreen();
+      });
+      document.addEventListener('fullscreenchange', () => {
+        const on = document.fullscreenElement === stageEl;
+        stageEl.classList.toggle('is-full', on);
+        stageFull.title = on ? 'Exit fullscreen (f)' : 'Fullscreen (f)';
+      });
 
       // ---------- Timer ----------
       function resetTimer() { remaining = intervalSeconds(); updateCount(); }
@@ -2272,8 +2532,12 @@
         if (e.key === '/' && !typing) { e.preventDefault(); searchInput.focus(); searchInput.select(); return; }
         if (typing) { if (e.key === 'Escape') t.blur(); return; }
         if (e.key === 'Escape') {
+          if (document.fullscreenElement) return;   // let the browser exit fullscreen
           if (activeId !== null) { e.preventDefault(); openGrid(); }
           else if (document.body.dataset.view === 'grid') { e.preventDefault(); openHome(); }
+        } else if ((e.key === 'f' || e.key === 'F') && activeId !== null) {
+          const cam = camById(activeId);
+          if (cam && cam.type !== 'stream') { e.preventDefault(); toggleFullscreen(); }
         } else if (activeId !== null && (e.key === 'ArrowRight' || e.key === 'ArrowDown')) {
           e.preventDefault(); stepDetail(1);
         } else if (activeId !== null && (e.key === 'ArrowLeft' || e.key === 'ArrowUp')) {
@@ -2316,6 +2580,17 @@
         resetTimer();
       })();
       setInterval(tick, 1000);
+
+      // Track the sticky top bar's height (it wraps to a variable number of rows
+      // on mobile) so the fixed-height detail area fits exactly below it.
+      (function trackTopbarHeight() {
+        const root = document.documentElement;
+        const topbar = document.querySelector('.topbar');
+        const set = () => root.style.setProperty('--topbar-h', topbar.offsetHeight + 'px');
+        set();
+        if (window.ResizeObserver) new ResizeObserver(set).observe(topbar);
+        window.addEventListener('resize', set);
+      })();
     })();
   </script>
 </body>
