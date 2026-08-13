@@ -4,7 +4,66 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b0e13" />
+  <meta name="description" content="Live U.S. National Park Service webcams — refreshing images and video streams across ~35 national parks." />
+  <!-- Installable web app (inline, single-file). iOS uses these meta tags; the
+       icon + manifest are generated at runtime by the script below. -->
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Park Cams" />
   <title>NPS Cams</title>
+  <script>
+    // Generate the app icon (canvas → PNG) and a web-app manifest at runtime so
+    // the app stays a single file yet is installable / add-to-home-screen.
+    (function () {
+      function drawIcon(size, maskable) {
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const x = c.getContext('2d');
+        const s = size / 512;              // scale from a 512 design grid
+        // Background (full-bleed so maskable icons have no transparent corners).
+        const g = x.createLinearGradient(0, 0, 0, size);
+        g.addColorStop(0, '#141a24'); g.addColorStop(1, '#0b0e13');
+        x.fillStyle = g; x.fillRect(0, 0, size, size);
+        // Sun.
+        x.fillStyle = '#e6b450';
+        x.beginPath(); x.arc(340 * s, 168 * s, 46 * s, 0, Math.PI * 2); x.fill();
+        // Back mountain (blue).
+        x.fillStyle = '#2f5f9e';
+        x.beginPath();
+        x.moveTo(70 * s, 380 * s); x.lineTo(230 * s, 190 * s); x.lineTo(330 * s, 300 * s);
+        x.lineTo(300 * s, 330 * s); x.lineTo(360 * s, 380 * s); x.closePath(); x.fill();
+        // Front mountain (green) with a snow cap.
+        x.fillStyle = '#2f8f57';
+        x.beginPath();
+        x.moveTo(150 * s, 400 * s); x.lineTo(300 * s, 210 * s); x.lineTo(450 * s, 400 * s);
+        x.closePath(); x.fill();
+        x.fillStyle = '#e6edf3';
+        x.beginPath();
+        x.moveTo(300 * s, 210 * s); x.lineTo(340 * s, 262 * s); x.lineTo(318 * s, 268 * s);
+        x.lineTo(300 * s, 250 * s); x.lineTo(282 * s, 268 * s); x.lineTo(260 * s, 262 * s);
+        x.closePath(); x.fill();
+        // Ground line.
+        x.fillStyle = '#0b0e13'; x.fillRect(0, 400 * s, size, size - 400 * s);
+        return c.toDataURL('image/png');
+      }
+      try {
+        const icon = drawIcon(512, true);
+        const link = (rel, extra) => { const l = document.createElement('link'); l.rel = rel; Object.assign(l, extra); document.head.appendChild(l); return l; };
+        link('apple-touch-icon', { href: icon });
+        link('icon', { href: icon, type: 'image/png', sizes: '512x512' });
+        const manifest = {
+          name: 'National Park Webcams', short_name: 'Park Cams',
+          description: 'Live U.S. National Park Service webcams.',
+          start_url: '.', scope: '.', display: 'standalone',
+          background_color: '#0b0e13', theme_color: '#0b0e13',
+          icons: [{ src: icon, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }]
+        };
+        const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+        link('manifest', { href: URL.createObjectURL(blob) });
+      } catch (e) { /* non-fatal: app still works without install metadata */ }
+    })();
+  </script>
   <style>
     :root {
       --bg: #0b0e13;

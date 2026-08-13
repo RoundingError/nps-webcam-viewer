@@ -240,6 +240,12 @@ codes (241 active / 46 inactive; 253 image / 34 video).
 ## Conventions & gotchas
 - Keep everything in the single file; do not introduce a build system or
   dependencies unless explicitly requested.
+- **PWA (inline / single-file):** a small `<script>` in `<head>` draws the app
+  icon on a canvas → PNG data URI and builds a web-app manifest as a blob URL,
+  wired up with `apple-touch-icon` + Apple `meta` tags. This makes it
+  installable / add-to-home-screen (esp. iOS) without extra files. There's **no
+  service worker**, so no Android/desktop install prompt and no offline caching
+  (those need a real same-origin `sw.js`, which would break single-file).
 - When toggling visibility via the `hidden` attribute, remember a CSS
   `display` rule on a class will override `[hidden]`. The `.imgError` overlay
   needed an explicit `.imgError[hidden] { display: none; }` rule for this
