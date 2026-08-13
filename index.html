@@ -289,6 +289,7 @@
     .badge {
       position: absolute;
       top: 10px; left: 10px;
+      z-index: 2;
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -309,6 +310,10 @@
     .badge.bad  .badge-label { color: #ff9d95; }
     .badge.stream .dot { background: var(--accent); box-shadow: 0 0 0 3px rgba(47,129,247,.22); }
     .badge.stream .badge-label { color: #9ec5ff; }
+    /* Neutral pending state until the first frame confirms the feed is up. */
+    .badge.loading .dot { background: #8b949e; box-shadow: 0 0 0 3px rgba(139,148,158,.18); animation: badgePulse 1.1s ease-in-out infinite; }
+    .badge.loading .badge-label { color: #c2ccd6; }
+    @keyframes badgePulse { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
     .thumb .noposter { position: absolute; inset: 0; background: linear-gradient(135deg,#1b2431,#0d1117); }
     #stageStream { width: 100%; height: 100%; border: 0; }
     .thumb .playbtn {
@@ -332,6 +337,7 @@
     .star {
       position: absolute;
       top: 8px; right: 8px;
+      z-index: 2;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -557,6 +563,7 @@
       background: #000;
     }
     .side-cam .stub img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .side-cam .stub .imgError { font-size: 11px; }
     .side-cam .label {
       padding: 8px 10px;
       font-size: 12px;
@@ -567,6 +574,7 @@
       gap: 6px;
     }
     .side-cam .label .dot { width: 6px; height: 6px; }
+    .side-cam .label .dot.bad { background: var(--danger); box-shadow: 0 0 0 3px rgba(248,81,73,.15); }
 
     .imgError {
       position: absolute;
@@ -724,7 +732,7 @@
       <div class="detail">
         <div class="stage">
           <div class="stage-img">
-            <span class="badge" id="stageBadge"><span class="dot"></span> <span class="badge-label">Online</span></span>
+            <span class="badge loading" id="stageBadge"><span class="dot"></span> <span class="badge-label">Loading</span></span>
             <button class="fsBtn" id="stageFull" title="Fullscreen (f)" aria-label="Toggle fullscreen">
               <svg viewBox="0 0 24 24" class="icon-enter" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
               <svg viewBox="0 0 24 24" class="icon-exit" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
@@ -742,12 +750,15 @@
             <span class="count" id="stageCount">next in 60s</span>
             <a class="iconBtn" id="stageWatch" target="_blank" rel="noopener" hidden>Watch ↗</a>
             <a class="iconBtn" id="stageLive" target="_blank" rel="noopener" hidden>Watch live ↗</a>
+            <button class="iconBtn" id="stageRefresh">Refresh</button>
+            <button class="iconBtn" id="stageSave" title="Save this image">
+              <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span class="lbl">Save image</span>
+            </button>
             <button class="iconBtn" id="stageShare" title="Share this camera">
               <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"/><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"/></svg>
               <span class="lbl">Share</span>
             </button>
-            <button class="iconBtn" id="stageRefresh">Refresh</button>
-            <button class="iconBtn" id="stageSave">Save image</button>
           </div>
         </div>
         <div class="sidebar" id="sidebar">
@@ -1652,8 +1663,12 @@
       let searchText = '';
       let hideOffline = false;
       let streamsOnly = false;
+      // Cameras NPS lists as active but whose feed persistently fails to load —
+      // treated as offline for the "Hide offline" filter and badges.
+      const deadIds = new Set();
+      function isOffline(cam) { return !!cam.off || deadIds.has(cam.id); }
       function passesFilters(cam) {
-        if (hideOffline && cam.off) return false;
+        if (hideOffline && isOffline(cam)) return false;
         if (streamsOnly && cam.type !== 'stream') return false;
         if (searchText && !((cam.name + ' ' + parkNameOf(cam.id)).toLowerCase().includes(searchText))) return false;
         return true;
@@ -1823,9 +1838,10 @@
 
       function setBadge(el, state, label) {
         if (!el) return;
-        el.classList.remove('warn', 'bad', 'stream');
+        el.classList.remove('warn', 'bad', 'stream', 'loading');
         if (state === 'offline') el.classList.add('bad');
         else if (state === 'stream') el.classList.add('stream');
+        else if (state === 'loading') el.classList.add('loading');
         else if (state !== 'live' && state !== 'online') el.classList.add('warn');
         const lab = el.querySelector('.badge-label');
         if (lab) lab.textContent = label;
@@ -1840,9 +1856,13 @@
         // also offer an actual live video feed (cam.live). Video embeds are
         // badged "Stream" elsewhere.
         let state = cam.live ? 'live' : 'online', label = cam.live ? 'Live' : 'Online';
-        if (cam.off) {
-          // NPS lists this camera as inactive.
+        if (cam.off || deadIds.has(id)) {
+          // NPS-inactive, or a feed that persistently fails to load.
           state = 'offline'; label = 'Offline';
+        } else if (!lastGoodSrc[id]) {
+          // Neutral pending state until the first frame confirms the feed is up,
+          // so we never flash "Online" on a camera that turns out to be dead.
+          state = 'loading'; label = 'Loading';
         } else if (rec && rec.ms != null && rec.ms > STALE_MS) {
           state = 'stale'; label = 'Stale · ' + humanAge(rec.ms);
         } else if ((!rec || rec.ms == null) && AIRQUALITY_RE.test(cam.url)) {
@@ -1863,7 +1883,7 @@
       // unknown; "offline" for inactive cams.
       function ageLabel(id, cam) {
         const rec = ageInfo[id];
-        if (cam.off) return 'offline';
+        if (cam.off || deadIds.has(id)) return 'offline';
         if (rec && rec.ms != null) return 'updated ' + humanAge(rec.ms) + ' ago';
         return '';
       }
@@ -1916,6 +1936,7 @@
 
         loader.onload = () => {
           state.tries = 0;
+          deadIds.delete(id);
           lastGoodSrc[id] = src;
           refs.forEach(r => {
             r.el.src = src;
@@ -1931,6 +1952,12 @@
           if (neverLoaded && state.tries >= SHOW_AFTER) {
             refs.forEach(r => { if (r.onFail) r.onFail(); });
             refs.forEach(r => setBadge(r.badge, 'offline', 'Offline'));
+            // Mark as offline so "Hide offline" catches feeds NPS lists as active
+            // but that never load. Re-render the grid if it's now filtered out.
+            if (!deadIds.has(id) && !lastGoodSrc[id]) {
+              deadIds.add(id);
+              if (hideOffline && activeId === null && !gridView.hidden) buildGrid();
+            }
           }
           const delay = Math.min(700 * state.tries, 5000);
           if (state.timer) clearTimeout(state.timer);
@@ -1972,7 +1999,7 @@
           : '<img alt="' + cam.name + '" /><div class="imgError" hidden>Unavailable</div>';
         const badgeHtml = isStream
           ? '<span class="badge stream"><span class="dot"></span> <span class="badge-label">Stream</span></span>'
-          : '<span class="badge"><span class="dot"></span> <span class="badge-label">Live</span></span>';
+          : '<span class="badge loading"><span class="dot"></span> <span class="badge-label">Loading</span></span>';
         card.innerHTML =
           '<div class="thumb">' + badgeHtml +
             '<button class="star' + (isFav(cam.id) ? ' on' : '') + '" title="Pin to favorites">' + STAR + '</button>' +
@@ -2111,17 +2138,23 @@
       function makeSideCam(cam) {
         const el = document.createElement('div');
         el.className = 'side-cam' + (cam.id === activeId ? ' active' : '');
+        const offNow = isOffline(cam);
         el.innerHTML =
-          '<div class="stub"><img alt="' + cam.name + '" /></div>' +
+          '<div class="stub"><img alt="' + cam.name + '" /><div class="imgError" hidden>Unavailable</div></div>' +
           '<div class="label"><span>' + cam.name + '</span>' +
-          (isFav(cam.id) ? '<span class="mini-star">' + STAR + '</span>' : '<span class="dot"></span>') +
+          (isFav(cam.id) ? '<span class="mini-star">' + STAR + '</span>'
+                         : '<span class="dot' + (offNow ? ' bad' : '') + '"></span>') +
           '</div>';
         const img = el.querySelector('img');
+        const err = el.querySelector('.imgError');
+        const dot = el.querySelector('.label .dot');
         if (cam.type === 'stream') {
           const p = streamPoster(cam);
           if (p) img.src = p;
         } else {
-          registerImg(cam.id, img);
+          registerImg(cam.id, img,
+            () => { err.hidden = true; if (dot) dot.classList.remove('bad'); },
+            () => { err.hidden = false; if (dot) dot.classList.add('bad'); });
         }
         el.addEventListener('click', () => openDetail(cam.id));
         return el;
@@ -2160,9 +2193,16 @@
           return group;
         }
 
-        const favs = favCameras();
+        // Hide offline cameras from the suggestions (keep the active one so the
+        // detail you're viewing always appears in its group).
+        const suggestable = (cam) => cam.id === activeId || !isOffline(cam);
+
+        const favs = favCameras().filter(suggestable);
         if (favs.length) sideList.appendChild(sideGroup('★ Favorites', favs, { persistKey: 'fav' }));
-        AREAS.forEach(group => sideList.appendChild(sideGroup(group.area, group.cameras)));
+        AREAS.forEach(group => {
+          const cams = group.cameras.filter(suggestable);
+          if (cams.length) sideList.appendChild(sideGroup(group.area, cams));
+        });
 
         // Update the toggle count and collapse the whole panel by default on mobile.
         const n = sideList.querySelectorAll('.side-cam').length;
@@ -2326,8 +2366,9 @@
         const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
         const fileName = cam.id + '_' + stamp + '.jpg';
         const url = stageImage.src;
-        const original = stageSave.textContent;
-        stageSave.textContent = 'Saving…';
+        const saveLbl = stageSave.querySelector('.lbl');
+        const original = saveLbl.textContent;
+        saveLbl.textContent = 'Saving…';
         stageSave.disabled = true;
         try {
           const resp = await fetch(url, { cache: 'force-cache' });
@@ -2366,7 +2407,7 @@
           // Last resort: open in a new tab so the user can right-click → Save.
           window.open(url, '_blank', 'noopener');
         } finally {
-          stageSave.textContent = original;
+          saveLbl.textContent = original;
           stageSave.disabled = false;
         }
       }

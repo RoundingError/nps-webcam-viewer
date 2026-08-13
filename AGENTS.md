@@ -103,7 +103,11 @@ show). Navigation tiers: **home → park grid → camera detail**.
   fetch). Prefers the native Save As dialog via `showSaveFilePicker()`, falling
   back to an anchor download, then to opening the image in a new tab.
 - **Status badges** — every tile/stage carries a badge (`applyBadge` / `setBadge`):
-  - **Online** (green) — default for refreshing still-image cameras.
+  - **Loading** (grey, pulsing) — the initial state for every image camera until
+    its first frame confirms the feed is up (`!lastGoodSrc[id]`), so we never
+    flash "Online" on a camera that turns out to be dead. Streams skip this (we
+    can't verify stream liveness) and show **Stream** immediately.
+  - **Online** (green) — refreshing still-image cameras, once a frame has loaded.
   - **Live** (green) — image cameras that also expose an external live-video
     feed (`cam.live` is set); same green styling as Online, plus a
     **Watch live ↗** button on the detail page.
@@ -116,8 +120,17 @@ show). Navigation tiers: **home → park grid → camera detail**.
     comes from a throttled `HEAD` read of `Last-Modified`, which is only
     readable cross-origin for hosts that send CORS headers — in practice
     `volcanoes.usgs.gov` and `cdn.pixelcaster.com` (`AGE_READABLE_RE`).
-  - **Offline** (red) — `off: true`, or an image that keeps failing to load.
+  - **Offline** (red) — `off: true` (NPS-inactive), or a feed that persistently
+    fails to load. The latter are tracked at runtime in a `deadIds` set
+    (`isOffline(cam)` = `cam.off || deadIds.has(id)`); a camera is added after it
+    exhausts retries without ever loading, and removed if it later succeeds.
   - **Stream** (blue) — `type: 'stream'`.
+- **"Hide offline" filter** — `passesFilters` uses `isOffline()`, so it hides
+  both `off:true` and runtime-dead cameras. If a camera dies while the filter is
+  active, the grid auto-rebuilds so it drops out.
+- **Sidebar suggestions** — the detail "Other cameras" list hides offline
+  cameras (`isOffline`), except the currently-viewed one. Each side-cam's status
+  dot turns red on failure and shows an "Unavailable" overlay (like grid tiles).
 - **Lazy loading** — an `IntersectionObserver` (`imgObserver`, `rootMargin`
   400px) tracks which registered `<img>`s are near the viewport. Each ref
   carries a `visible` flag; the observer kicks off the first load when a tile
