@@ -5,12 +5,11 @@ A single-file, dependency-free dashboard for viewing U.S. National Park Service
 across ~35 national parks, with a home overview, global favorites, adjustable
 auto-refresh, fullscreen viewing, and full-resolution image saving.
 
-## 🔴 Live demo
+## 🔴 Live Page
 
 **[roundingerror.github.io/nps-webcam-viewer](https://roundingerror.github.io/nps-webcam-viewer/)**
 
-Served via GitHub Pages. YouTube live streams embed inline there (they can't from
-a local `file://` open — see below).
+Served via GitHub Pages. 
 
 ## Usage
 
