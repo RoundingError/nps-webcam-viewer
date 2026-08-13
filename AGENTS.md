@@ -9,6 +9,9 @@ A single-file, dependency-free dashboard for viewing U.S. National Park Service
 CSS, and vanilla JavaScript in one file. No build step, no framework, no
 package manager. Open the file in a browser to run it.
 
+Published via GitHub Pages at
+<https://roundingerror.github.io/nps-webcam-viewer/> (served from `main`).
+
 Covers ~35 National Parks (~200+ feeds): refreshing still images **and** live
 video streams, each tagged Online / Live / Air Quality / Stale / Offline / Stream.
 The camera
