@@ -587,6 +587,9 @@
     .iconBtn:hover { background: #1e2530; border-color: #313a48; }
     /* Icon + label buttons (e.g. Share). */
     .iconBtn:has(.ic) { display: inline-flex; align-items: center; gap: 7px; }
+    /* Keep the `hidden` attribute authoritative — the display rule above would
+       otherwise re-show buttons we hide for streams (e.g. Save image). */
+    .iconBtn[hidden] { display: none; }
     .iconBtn .ic { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 
     .sidebar {
@@ -1497,6 +1500,46 @@
                 { id: 'chis-peregrine', name: 'Peregrine Falcon Webcam', type: 'stream', embed: 'https://www.youtube.com/embed/YmZv8Pfwum4' },
                 { id: 'chis-eagle-sauces', name: 'Bald Eagle — Sauces Canyon Nest', type: 'stream', embed: 'https://www.youtube.com/embed/rnTsOesC6hE' },
                 { id: 'chis-eagle-fraser', name: 'Bald Eagle — Fraser Point Nest', type: 'stream', embed: 'https://www.youtube.com/embed/OY4V_AppZ6s' },
+                { id: 'chis-diablo', name: 'Mount Diablo Webcam', type: 'stream', embed: 'https://www.youtube.com/embed/f5Rjm5tiEkU' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Redwood',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'redw-kvc', name: 'Kuchel Visitor Center — Pacific Ocean', url: 'https://www.nps.gov/webcams-redw/KVC_Pacific_Ocean.jpg', hero: true },
+                { id: 'redw-jedsmith', name: 'Jedediah Smith Redwoods', url: 'https://www.nps.gov/webcams-redw/Jed_Smith.jpg' },
+                { id: 'redw-elkprairie', name: 'Elk Prairie — Prairie Creek Redwoods', url: 'https://www.nps.gov/webcams-redw/Elk_Prairie.jpg' },
+                { id: 'redw-baldhills', name: 'Bald Hills & Redwood Creek', url: 'https://www.nps.gov/webcams-redw/Bald_Hills.jpg' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'Gateway Arch',
+          areas: [
+            {
+              // Live views of the Arch (Dacast), linked from the Gateway Arch
+              // Park Foundation's official webcams page (archpark.org/visit/webcams).
+              area: 'Live Streams',
+              cameras: [
+                { id: 'jeff-east', name: 'East View', type: 'stream', embed: 'https://iframe.dacast.com/live/b44603d7-b221-fc91-5fa2-f9d35bf908f2/e263ea86-84e6-66eb-1b29-646a22389f14' },
+                { id: 'jeff-west', name: 'West View', type: 'stream', embed: 'https://iframe.dacast.com/live/b44603d7-b221-fc91-5fa2-f9d35bf908f2/2c46c826-e173-5e74-db7f-ee319f0fb8a6' },
+              ],
+            },
+          ],
+        },
+        {
+          park: 'North Cascades',
+          areas: [
+            {
+              area: 'Cameras',
+              cameras: [
+                { id: 'noca-air', name: 'North Cascades (Air Quality)', url: 'https://www.nps.gov/featurecontent/ard/webcams/images/nocalarge.jpg' },
               ],
             },
           ],
@@ -1525,7 +1568,8 @@
         'Lassen Volcanic': 'lavo', 'Mammoth Cave': 'maca', 'Mesa Verde': 'meve',
         'New River Gorge': 'neri', 'Sequoia & Kings Canyon': 'seki',
         'Shenandoah': 'shen', 'Wrangell-St. Elias': 'wrst', 'Katmai': 'katm',
-        'Carlsbad Caverns': 'cave', 'Channel Islands': 'chis',
+        'Carlsbad Caverns': 'cave', 'Channel Islands': 'chis', 'Redwood': 'redw',
+        'Gateway Arch': 'jeff', 'North Cascades': 'noca',
       };
 
       // Approximate park-center coordinates [lat, lon] — used only to fetch a
@@ -1551,6 +1595,8 @@
         'Sequoia & Kings Canyon': [36.49, -118.83], 'Shenandoah': [38.53, -78.35],
         'Wrangell-St. Elias': [61.71, -142.99], 'Katmai': [58.61, -155.00],
         'Carlsbad Caverns': [32.17, -104.44], 'Channel Islands': [34.01, -119.42],
+        'Redwood': [41.30, -124.00], 'Gateway Arch': [38.6247, -90.1848],
+        'North Cascades': [48.68, -121.29],
       };
 
       // Per-camera coordinates [lat, lon] from the NPS Solr catalog (matched to
@@ -1622,6 +1668,8 @@
         'neri-canyon-rim': [38.06725, -81.07805], 'shen-big-meadows': [38.51772, -78.43669],
         'shen-mountain-view': [38.62755, -78.33819], 'wrst-kennecott-mill': [61.48715, -142.87907],
         'wrst-kennicott-glacier': [61.48715, -142.87907], 'wrst-hq': [62.0213, -145.36233],
+        'redw-kvc': [41.2869, -124.0911], 'redw-jedsmith': [41.7986, -124.0845],
+        'redw-elkprairie': [41.3618, -124.0255], 'redw-baldhills': [41.1514, -123.883],
       };
 
       // Per-camera NPS page (from the Solr catalog): lets users open the
@@ -1759,6 +1807,11 @@
         'wrst-kennecott-mill': 'https://www.nps.gov/media/webcam/view.htm?id=51F606E1-BAF1-472B-2BC7D21ED4CDA08E',
         'wrst-kennicott-glacier': 'https://www.nps.gov/media/webcam/view.htm?id=5224B014-CBDE-5E14-DEF34EBF65E78E88',
         'wrst-hq': 'https://www.nps.gov/media/webcam/view.htm?id=F91F11B2-C421-28C4-16C717FF1FF2CB72',
+        'redw-jedsmith': 'https://www.nps.gov/media/webcam/view.htm?id=BB7B050A-BE3B-E7FE-BFED58CB2E874B0F',
+        'redw-kvc': 'https://www.nps.gov/media/webcam/view.htm?id=BD37BB78-0E56-34CE-3270526D6CCC87CA',
+        'redw-elkprairie': 'https://www.nps.gov/media/webcam/view.htm?id=7553A227-AAEA-6A87-2496155B0FB5BE97',
+        'redw-baldhills': 'https://www.nps.gov/media/webcam/view.htm?id=02E6B14D-AF74-6C67-7AF43C0AC3FA23CE',
+        'noca-air': 'https://www.nps.gov/subjects/air/webcams.htm?site=noca',
       };
 
       function areaOf(id) {
